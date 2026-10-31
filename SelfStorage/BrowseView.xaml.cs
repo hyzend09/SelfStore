@@ -32,6 +32,18 @@ public partial class BrowseView : UserControl
     public void LoadUnits()
     {
         if (!_ready) return;
+        if (!UiActions.Try(_db.Reload)) return;
+        var facilityId = (cbFacility.SelectedItem as Facility)?.Id ?? 0;
+        var type = cbType.SelectedItem as string ?? "Tất cả";
+        _ready = false;
+        var facilities = new List<Facility> { new() { Id = 0, Name = "Tất cả" } };
+        facilities.AddRange(_db.Facilities);
+        cbFacility.ItemsSource = facilities;
+        cbFacility.SelectedItem = facilities.FirstOrDefault(f => f.Id == facilityId) ?? facilities[0];
+        var types = new[] { "Tất cả" }.Concat(_db.Units.Select(u => u.Type).Distinct()).ToList();
+        cbType.ItemsSource = types;
+        cbType.SelectedItem = types.Contains(type) ? type : types[0];
+        _ready = true;
         IEnumerable<StorageUnit> q = _db.Units;
 
         if (cbFacility.SelectedItem is Facility f && f.Id != 0) q = q.Where(u => u.FacilityId == f.Id);
@@ -45,6 +57,9 @@ public partial class BrowseView : UserControl
     {
         if (grid.SelectedItem is not StorageUnit unit)
         { MessageBox.Show("Hãy chọn một kho trong danh sách."); return; }
+        if (!UiActions.Try(_db.Reload)) return;
+        unit = _db.Units.FirstOrDefault(u => u.Id == unit.Id)!;
+        if (unit == null) { LoadUnits(); return; }
         if (!unit.IsAvailable)
         { MessageBox.Show("Kho này đã được thuê."); return; }
 

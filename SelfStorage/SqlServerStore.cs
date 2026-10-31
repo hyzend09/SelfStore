@@ -34,7 +34,7 @@ internal sealed class SqlServerStore(string connectionString)
         Read("SELECT SchemaVersion, Revision FROM dbo.StoreState WITH (UPDLOCK, HOLDLOCK) WHERE Id = 1", r =>
         {
             hasState = true;
-            if (r.GetInt32(0) != 1) throw new InvalidDataException("Phiên bản database chưa được hỗ trợ.");
+            if (r.GetInt32(0) != 2) throw new InvalidDataException("Phiên bản database chưa được hỗ trợ.");
             db.Revision = r.GetInt64(1);
         });
         if (!hasState) throw new InvalidDataException("Thiếu thông tin phiên bản database (StoreState).");
@@ -46,11 +46,16 @@ internal sealed class SqlServerStore(string connectionString)
         Read("SELECT Id, FacilityId, Code, Type, SizeM2, PricePerMonth, IsAvailable FROM dbo.StorageUnits ORDER BY Id", r =>
             db.Units.Add(new StorageUnit { Id = r.GetInt32(0), FacilityId = r.GetInt32(1), Code = r.GetString(2),
                 Type = r.GetString(3), SizeM2 = r.GetDouble(4), PricePerMonth = r.GetDecimal(5), IsAvailable = r.GetBoolean(6) }));
-        Read("SELECT Id, UserId, UnitId, StartDate, Months, Deposit, RentFee, PaymentMethod, PaidAt, QrContent, IsReturned, ReturnedAt FROM dbo.Rentals ORDER BY Id", r =>
+        Read("SELECT Id, UserId, UnitId, StartDate, Months, Deposit, RentFee, PaymentMethod, PaidAt, QrContent, IsReturned, ReturnedAt, CustomerNameSnapshot, UnitCodeSnapshot, FacilityNameSnapshot, FacilityAddressSnapshot, ReceivedAt, ReceivedByUserId, ReturnRequestedAt, InspectedAt, InspectedByUserId, InspectionNotes, Deduction, RefundAmount, RefundedAt, RefundedByUserId, RefundReference, IsLegacyRental FROM dbo.Rentals ORDER BY Id", r =>
             db.Rentals.Add(new Rental { Id = r.GetInt32(0), UserId = r.GetInt32(1), UnitId = r.GetInt32(2),
                 StartDate = r.GetDateTime(3), Months = r.GetInt32(4), Deposit = r.GetDecimal(5), RentFee = r.GetDecimal(6),
                 PaymentMethod = r.GetString(7), PaidAt = r.GetDateTime(8), QrContent = r.GetString(9),
-                IsReturned = r.GetBoolean(10), ReturnedAt = r.IsDBNull(11) ? null : r.GetDateTime(11) }));
+                IsReturned = r.GetBoolean(10), ReturnedAt = Date(r, 11),
+                CustomerNameSnapshot = r.GetString(12), UnitCodeSnapshot = r.GetString(13), FacilityNameSnapshot = r.GetString(14),
+                FacilityAddressSnapshot = r.GetString(15), ReceivedAt = Date(r, 16), ReceivedByUserId = Id(r, 17),
+                ReturnRequestedAt = Date(r, 18), InspectedAt = Date(r, 19), InspectedByUserId = Id(r, 20),
+                InspectionNotes = r.GetString(21), Deduction = r.GetDecimal(22), RefundAmount = r.GetDecimal(23),
+                RefundedAt = Date(r, 24), RefundedByUserId = Id(r, 25), RefundReference = r.GetString(26), IsLegacyRental = r.GetBoolean(27) }));
         transaction.Commit();
         return db;
 
@@ -71,7 +76,7 @@ internal sealed class SqlServerStore(string connectionString)
         using (var check = new SqlCommand("SELECT Revision FROM dbo.StoreState WITH (UPDLOCK, HOLDLOCK) WHERE Id = 1", connection, transaction))
         {
             if (Convert.ToInt64(check.ExecuteScalar()) != db.Revision)
-                throw new StoreConcurrencyException("Dữ liệu đã thay đổi ở phiên khác. Hãy mở lại ứng dụng để tải dữ liệu mới.");
+                throw new StoreConcurrencyException("Dữ liệu đã thay đổi ở phiên khác. Danh sách sẽ được tải lại; hãy kiểm tra và thử thao tác lại.");
         }
 
         DeleteMissing("Rentals", db.Rentals.Select(r => r.Id));
@@ -85,9 +90,12 @@ internal sealed class SqlServerStore(string connectionString)
                 u.Id, u.FacilityId, u.Code, u.Type, u.SizeM2, u.PricePerMonth, u.IsAvailable);
         // Release returned rentals before inserting a later rental for the same unit.
         foreach (var r in db.Rentals.OrderByDescending(r => r.IsReturned).ThenBy(r => r.Id))
-            Upsert("Rentals", ["Id", "UserId", "UnitId", "StartDate", "Months", "Deposit", "RentFee", "PaymentMethod", "PaidAt", "QrContent", "IsReturned", "ReturnedAt"],
+            Upsert("Rentals", ["Id", "UserId", "UnitId", "StartDate", "Months", "Deposit", "RentFee", "PaymentMethod", "PaidAt", "QrContent", "IsReturned", "ReturnedAt", "CustomerNameSnapshot", "UnitCodeSnapshot", "FacilityNameSnapshot", "FacilityAddressSnapshot", "ReceivedAt", "ReceivedByUserId", "ReturnRequestedAt", "InspectedAt", "InspectedByUserId", "InspectionNotes", "Deduction", "RefundAmount", "RefundedAt", "RefundedByUserId", "RefundReference", "IsLegacyRental"],
                 r.Id, r.UserId, r.UnitId, r.StartDate, r.Months, r.Deposit, r.RentFee, r.PaymentMethod, r.PaidAt,
-                r.QrContent, r.IsReturned, r.ReturnedAt);
+                r.QrContent, r.IsReturned, r.ReturnedAt, r.CustomerNameSnapshot, r.UnitCodeSnapshot, r.FacilityNameSnapshot,
+                r.FacilityAddressSnapshot, r.ReceivedAt, r.ReceivedByUserId, r.ReturnRequestedAt, r.InspectedAt,
+                r.InspectedByUserId, r.InspectionNotes, r.Deduction, r.RefundAmount, r.RefundedAt, r.RefundedByUserId,
+                r.RefundReference, r.IsLegacyRental);
 
         DeleteMissing("StorageUnits", db.Units.Select(u => u.Id));
         DeleteMissing("Facilities", db.Facilities.Select(f => f.Id));
@@ -101,7 +109,7 @@ internal sealed class SqlServerStore(string connectionString)
 
         void DeleteMissing(string table, IEnumerable<int> ids) => Execute(
             $"DELETE FROM dbo.[{table}] WHERE Id NOT IN (SELECT CAST([value] AS int) FROM OPENJSON(@p0))",
-            JsonSerializer.Serialize(ids));
+            [JsonSerializer.Serialize(ids)]);
 
         void Upsert(string table, string[] columns, params object?[] values)
         {
@@ -110,21 +118,26 @@ internal sealed class SqlServerStore(string connectionString)
             var names = string.Join(",", columns.Select(c => $"[{c}]"));
             var parameters = string.Join(",", columns.Select((_, i) => $"@p{i}"));
             Execute($"UPDATE dbo.[{table}] SET {assignments} WHERE Id=@p0; " +
-                $"IF @@ROWCOUNT=0 INSERT dbo.[{table}] ({names}) VALUES ({parameters});", values);
+                $"IF @@ROWCOUNT=0 INSERT dbo.[{table}] ({names}) VALUES ({parameters});", values, columns);
         }
 
-        void Execute(string sql, params object?[] values)
+        void Execute(string sql, object?[]? values = null, string[]? columns = null)
         {
+            values ??= [];
             using var command = new SqlCommand(sql, connection, transaction);
             for (int i = 0; i < values.Length; i++)
             {
                 var parameter = command.Parameters.AddWithValue($"@p{i}", values[i] ?? DBNull.Value);
                 // Preserve the full datetime2 precision instead of inferring datetime.
-                if (values[i] is DateTime || (values[i] == null && i == 11)) parameter.SqlDbType = SqlDbType.DateTime2;
+                if (values[i] is DateTime || columns?[i].EndsWith("At") == true) parameter.SqlDbType = SqlDbType.DateTime2;
+                else if (columns?[i].EndsWith("UserId") == true) parameter.SqlDbType = SqlDbType.Int;
             }
             command.ExecuteNonQuery();
         }
     }
+
+    static DateTime? Date(SqlDataReader reader, int column) => reader.IsDBNull(column) ? null : reader.GetDateTime(column);
+    static int? Id(SqlDataReader reader, int column) => reader.IsDBNull(column) ? null : reader.GetInt32(column);
 }
 
 public sealed class StoreConcurrencyException(string message) : Exception(message);

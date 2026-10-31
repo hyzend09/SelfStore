@@ -23,6 +23,7 @@
                         <ComboBox x:Name="cbFilter" Width="200" Margin="6,0,16,0" DisplayMemberPath="Name"
                                   SelectionChanged="Filter_Changed"/>
                         <Button Content="+ Thêm kho" Click="AddUnit_Click"/>
+                        <Button Content="Làm mới" Click="Refresh_Click"/>
                         <Button Content="Sửa" Click="EditUnit_Click"/>
                         <Button Content="Xóa" Click="DeleteUnit_Click"/>
                     </StackPanel>
@@ -35,7 +36,7 @@
                             <DataGridTextColumn Header="Mã kho" Binding="{Binding Code}" Width="100"/>
                             <DataGridTextColumn Header="Loại" Binding="{Binding Type}" Width="110"/>
                             <DataGridTextColumn Header="Diện tích (m²)" Binding="{Binding SizeM2}" Width="110"/>
-                            <DataGridTextColumn Header="Giá / tháng" Binding="{Binding PricePerMonth, StringFormat={}{0:N0} ₫}" Width="140"/>
+                            <DataGridTextColumn Header="Giá / tháng" Binding="{Binding PricePerMonth, StringFormat={}{0:N2} ₫}" Width="140"/>
                             <DataGridTextColumn Header="Trạng thái" Binding="{Binding StatusText}" Width="100"/>
                         </DataGrid.Columns>
                     </DataGrid>
@@ -47,6 +48,7 @@
                 <DockPanel Margin="12">
                     <StackPanel DockPanel.Dock="Top" Orientation="Horizontal" Margin="0,0,0,8">
                         <Button Content="+ Thêm cơ sở" Click="AddFacility_Click"/>
+                        <Button Content="Làm mới" Click="Refresh_Click"/>
                         <Button Content="Sửa" Click="EditFacility_Click"/>
                         <Button Content="Xóa" Click="DeleteFacility_Click"/>
                     </StackPanel>
@@ -65,9 +67,14 @@
             </TabItem>
 
             <!-- ===== ĐƠN THUÊ ===== -->
-            <TabItem Header="Đơn thuê (xem)">
+            <TabItem Header="Nhận / trả kho và cọc">
                 <DockPanel Margin="12">
-                    <Button DockPanel.Dock="Top" Content="Làm mới" HorizontalAlignment="Left" Click="Refresh_Click"/>
+                    <StackPanel DockPanel.Dock="Top" Orientation="Horizontal">
+                        <Button Content="Làm mới" Click="Refresh_Click"/>
+                        <Button Content="Bàn giao nhận kho (QR)" Click="Receive_Click"/>
+                        <Button Content="Kiểm tra trả kho" Click="Inspect_Click"/>
+                        <Button Content="Xác nhận hoàn cọc" Click="Refund_Click"/>
+                    </StackPanel>
                     <DataGrid x:Name="gridRentals" AutoGenerateColumns="False" IsReadOnly="True"
                               CanUserAddRows="False" HeadersVisibility="Column">
                         <DataGrid.Columns>
@@ -77,9 +84,10 @@
                             <DataGridTextColumn Header="Kho" Binding="{Binding UnitCode}" Width="80"/>
                             <DataGridTextColumn Header="Bắt đầu" Binding="{Binding StartDate, StringFormat=dd/MM/yyyy}" Width="90"/>
                             <DataGridTextColumn Header="Kết thúc" Binding="{Binding EndDate, StringFormat=dd/MM/yyyy}" Width="90"/>
-                            <DataGridTextColumn Header="Tổng tiền" Binding="{Binding Total, StringFormat={}{0:N0} ₫}" Width="120"/>
+                            <DataGridTextColumn Header="Tổng tiền" Binding="{Binding Total, StringFormat={}{0:N2} ₫}" Width="120"/>
                             <DataGridTextColumn Header="Thanh toán" Binding="{Binding PaymentMethod}" Width="110"/>
-                            <DataGridTextColumn Header="Trạng thái" Binding="{Binding StatusText}" Width="90"/>
+                            <DataGridTextColumn Header="Trạng thái" Binding="{Binding StatusText}" Width="170"/>
+                            <DataGridTextColumn Header="Đối soát cọc" Binding="{Binding RefundText}" Width="180"/>
                         </DataGrid.Columns>
                     </DataGrid>
                 </DockPanel>

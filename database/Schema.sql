@@ -66,4 +66,39 @@ BEGIN
     CREATE UNIQUE INDEX UX_Rentals_ActiveUnit ON dbo.Rentals(UnitId) WHERE IsReturned = 0;
     CREATE INDEX IX_Rentals_UserId ON dbo.Rentals(UserId);
 END;
+
+IF EXISTS (SELECT 1 FROM dbo.StoreState WHERE SchemaVersion NOT IN (1, 2))
+    THROW 50003, 'Unsupported SelfStorage schema version.', 1;
+
+IF EXISTS (SELECT 1 FROM dbo.StoreState WHERE Id = 1 AND SchemaVersion = 1)
+BEGIN
+    ALTER TABLE dbo.Rentals ADD
+        CustomerNameSnapshot nvarchar(200) NOT NULL CONSTRAINT DF_Rentals_CustomerSnapshot DEFAULT N'',
+        UnitCodeSnapshot nvarchar(100) NOT NULL CONSTRAINT DF_Rentals_UnitSnapshot DEFAULT N'',
+        FacilityNameSnapshot nvarchar(200) NOT NULL CONSTRAINT DF_Rentals_FacilitySnapshot DEFAULT N'',
+        FacilityAddressSnapshot nvarchar(500) NOT NULL CONSTRAINT DF_Rentals_AddressSnapshot DEFAULT N'',
+        ReceivedAt datetime2 NULL,
+        ReceivedByUserId int NULL CONSTRAINT FK_Rentals_Receiver REFERENCES dbo.Users(Id),
+        ReturnRequestedAt datetime2 NULL,
+        InspectedAt datetime2 NULL,
+        InspectedByUserId int NULL CONSTRAINT FK_Rentals_Inspector REFERENCES dbo.Users(Id),
+        InspectionNotes nvarchar(1000) NOT NULL CONSTRAINT DF_Rentals_Notes DEFAULT N'',
+        Deduction decimal(18,2) NOT NULL CONSTRAINT DF_Rentals_Deduction DEFAULT 0,
+        RefundAmount decimal(18,2) NOT NULL CONSTRAINT DF_Rentals_Refund DEFAULT 0,
+        RefundedAt datetime2 NULL,
+        RefundedByUserId int NULL CONSTRAINT FK_Rentals_Refunder REFERENCES dbo.Users(Id),
+        RefundReference nvarchar(200) NOT NULL CONSTRAINT DF_Rentals_Reference DEFAULT N'',
+        IsLegacyRental bit NOT NULL CONSTRAINT DF_Rentals_Legacy DEFAULT 0;
+    -- Dynamic SQL compiles after the new columns exist, including on a fresh database.
+    EXEC(N'UPDATE r SET CustomerNameSnapshot = c.FullName, UnitCodeSnapshot = u.Code,
+        FacilityNameSnapshot = f.Name, FacilityAddressSnapshot = f.Address, IsLegacyRental = 1
+        FROM dbo.Rentals r JOIN dbo.Users c ON c.Id = r.UserId
+        JOIN dbo.StorageUnits u ON u.Id = r.UnitId JOIN dbo.Facilities f ON f.Id = u.FacilityId;
+        ALTER TABLE dbo.Rentals ADD CONSTRAINT CK_Rentals_Settlement CHECK (
+            Deduction >= 0 AND Deduction <= Deposit AND RefundAmount >= 0 AND
+            (InspectedAt IS NULL OR (ReturnRequestedAt IS NOT NULL AND RefundAmount = Deposit - Deduction AND LEN(LTRIM(RTRIM(InspectionNotes))) > 0)) AND
+            (RefundedAt IS NULL OR (InspectedAt IS NOT NULL AND IsReturned = 1 AND LEN(LTRIM(RTRIM(RefundReference))) > 0)) AND
+            (IsReturned = 0 OR IsLegacyRental = 1 OR RefundedAt IS NOT NULL));');
+    UPDATE dbo.StoreState SET SchemaVersion = 2, Revision = CASE WHEN Revision = 0 THEN 0 ELSE Revision + 1 END WHERE Id = 1;
+END;
 COMMIT;

@@ -50,14 +50,37 @@ public class Rental
     public string QrContent { get; set; } = "";
     public bool IsReturned { get; set; }
     public DateTime? ReturnedAt { get; set; }
+    public string CustomerNameSnapshot { get; set; } = "";
+    public string UnitCodeSnapshot { get; set; } = "";
+    public string FacilityNameSnapshot { get; set; } = "";
+    public string FacilityAddressSnapshot { get; set; } = "";
+    public DateTime? ReceivedAt { get; set; }
+    public int? ReceivedByUserId { get; set; }
+    public DateTime? ReturnRequestedAt { get; set; }
+    public DateTime? InspectedAt { get; set; }
+    public int? InspectedByUserId { get; set; }
+    public string InspectionNotes { get; set; } = "";
+    public decimal Deduction { get; set; }
+    public decimal RefundAmount { get; set; }
+    public DateTime? RefundedAt { get; set; }
+    public int? RefundedByUserId { get; set; }
+    public string RefundReference { get; set; } = "";
+    public bool IsLegacyRental { get; set; }
 
     [JsonIgnore] public string CustomerName =>
-        DataStore.Instance.Users.FirstOrDefault(u => u.Id == UserId)?.FullName ?? "";
+        CustomerNameSnapshot;
     [JsonIgnore] public DateTime EndDate => StartDate.AddMonths(Months);
     [JsonIgnore] public decimal Total => Deposit + RentFee;
     [JsonIgnore] public StorageUnit? Unit => DataStore.Instance.Units.FirstOrDefault(u => u.Id == UnitId);
-    [JsonIgnore] public string UnitCode => Unit?.Code ?? "";
-    [JsonIgnore] public string FacilityName => Unit?.FacilityName ?? "";
-    [JsonIgnore] public string StatusText =>
-        IsReturned ? "Đã trả" : (EndDate.Date < DateTime.Today ? "Quá hạn" : "Đang thuê");
+    [JsonIgnore] public string UnitCode => UnitCodeSnapshot;
+    [JsonIgnore] public string FacilityName => FacilityNameSnapshot;
+    [JsonIgnore] public string StatusText => IsReturned
+        ? (IsLegacyRental && RefundedAt == null ? "Đã trả (dữ liệu cũ)" : "Đã hoàn tất")
+        : InspectedAt != null ? "Chờ hoàn cọc"
+        : ReturnRequestedAt != null ? "Chờ kiểm tra trả kho"
+        : EndDate.Date < DateTime.Today ? "Quá hạn"
+        : ReceivedAt == null && !IsLegacyRental ? "Chờ nhận kho" : "Đang thuê";
+    [JsonIgnore] public string RefundText => RefundedAt != null ? $"Đã đối soát: {RefundAmount:N2} ₫"
+        : IsReturned && IsLegacyRental ? "Chưa có đối soát cọc cũ"
+        : InspectedAt != null ? $"Chờ hoàn: {RefundAmount:N2} ₫" : "Chưa kiểm tra";
 }

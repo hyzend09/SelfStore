@@ -12,7 +12,7 @@ public partial class UnitEditWindow : Window
     {
         InitializeComponent();
         _isNew = existing == null;
-        Unit = existing ?? new StorageUnit { Id = _db.Units.Count == 0 ? 1 : _db.Units.Max(u => u.Id) + 1 };
+        Unit = existing == null ? new StorageUnit() : System.Text.Json.JsonSerializer.Deserialize<StorageUnit>(System.Text.Json.JsonSerializer.Serialize(existing))!;
         Title = _isNew ? "Thêm kho" : $"Sửa kho {Unit.Code}";
 
         cbFacility.ItemsSource = _db.Facilities;
@@ -31,7 +31,7 @@ public partial class UnitEditWindow : Window
             txtCode.Text = Unit.Code;
             cbType.Text = Unit.Type;
             txtSize.Text = Unit.SizeM2.ToString();
-            txtPrice.Text = Unit.PricePerMonth.ToString("0");
+            txtPrice.Text = Unit.PricePerMonth.ToString("0.##");
             chkAvail.IsChecked = Unit.IsAvailable;
 
             // Kho đang có khách thuê thì không cho đổi trạng thái / cơ sở
@@ -55,8 +55,9 @@ public partial class UnitEditWindow : Window
                                u.Code.Equals(code, StringComparison.OrdinalIgnoreCase)))
         { lblError.Text = "Mã kho đã tồn tại trong cơ sở này."; return; }
         if (type == "") { lblError.Text = "Nhập loại kho."; return; }
-        if (!double.TryParse(txtSize.Text, out var size) || size <= 0) { lblError.Text = "Diện tích phải là số > 0."; return; }
-        if (!decimal.TryParse(txtPrice.Text, out var price) || price <= 0) { lblError.Text = "Giá thuê phải là số > 0."; return; }
+        if (!double.TryParse(txtSize.Text, out var size) || !double.IsFinite(size) || size <= 0) { lblError.Text = "Diện tích phải là số hữu hạn > 0."; return; }
+        if (!decimal.TryParse(txtPrice.Text, out var price) || !DataStore.ValidMoney(price)) { lblError.Text = "Giá thuê phải > 0, tối đa 2 chữ số thập phân."; return; }
+        if (code.Length > 100 || type.Length > 100) { lblError.Text = "Mã/loại kho tối đa 100 ký tự."; return; }
 
         Unit.FacilityId = fac.Id;
         Unit.Code = code;

@@ -1,6 +1,7 @@
 using Microsoft.Data.SqlClient;
 using SelfStorage;
 using System.Text.Json;
+using System.IO;
 
 // Real SQL Server integration checks. Every database is uniquely named and removed.
 var masterString = Environment.GetEnvironmentVariable("SELFSTORAGE_TEST_CONNECTION_STRING")
@@ -46,6 +47,7 @@ try
 
     var stale = DataStore.Open(connection);
     persisted.IsReturned = true;
+    persisted.IsLegacyRental = true; // Legacy return history has no settlement audit.
     persisted.ReturnedAt = DateTime.Now;
     db.Units.Last().IsAvailable = true;
     db.Save();
@@ -126,7 +128,9 @@ try
     empty.Users.Clear();
     empty.Save();
     Check(DataStore.Open(provisionedConnection).Users.Count == 0, "initialized empty database is not reseeded");
-    Console.WriteLine("All SQL Server integration checks passed.");
+    await WorkflowChecks.Run(NewDatabase);
+    WpfChecks.Run(NewDatabase());
+    Console.WriteLine("All SQL Server and WPF workflow checks passed.");
 
     bool ConcurrentSave(DataStore data)
     {

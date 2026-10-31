@@ -15,8 +15,10 @@ public partial class App : Application
         {
             if (args.Exception is not (SqlException or StoreConcurrencyException or IOException or JsonException)) return;
             args.Handled = true;
-            ShowDatabaseError(args.Exception);
-            Shutdown(1);
+            try { DataStore.Instance.Reload(); } catch { }
+            MessageBox.Show("Thao tác chưa hoàn tất. Hãy làm mới dữ liệu và thử lại.\n" +
+                (args.Exception is SqlException ? "Kiểm tra kết nối hoặc thông tin nhập." : args.Exception.Message),
+                "SelfStorage", MessageBoxButton.OK, MessageBoxImage.Warning);
         };
         try { _ = DataStore.Instance; }
         catch (Exception ex)

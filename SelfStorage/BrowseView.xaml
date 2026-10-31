@@ -9,6 +9,7 @@
             <ComboBox x:Name="cbType" Width="140" Margin="6,0,16,0" SelectionChanged="Filter_Changed"/>
             <CheckBox x:Name="chkAvail" Content="Chỉ hiện kho còn trống" IsChecked="True" VerticalAlignment="Center"
                       Checked="Filter_Changed" Unchecked="Filter_Changed"/>
+            <Button Content="Làm mới" Click="Filter_Changed" Margin="12,0,0,0"/>
         </StackPanel>
         <Button DockPanel.Dock="Bottom" Content="Đặt kho đã chọn" HorizontalAlignment="Right" Click="Book_Click"/>
         <DataGrid x:Name="grid" AutoGenerateColumns="False" IsReadOnly="True" SelectionMode="Single"
@@ -18,7 +19,7 @@
                 <DataGridTextColumn Header="Mã kho" Binding="{Binding Code}" Width="100"/>
                 <DataGridTextColumn Header="Loại" Binding="{Binding Type}" Width="110"/>
                 <DataGridTextColumn Header="Diện tích (m²)" Binding="{Binding SizeM2}" Width="110"/>
-                <DataGridTextColumn Header="Giá / tháng" Binding="{Binding PricePerMonth, StringFormat={}{0:N0} ₫}" Width="140"/>
+                <DataGridTextColumn Header="Giá / tháng" Binding="{Binding PricePerMonth, StringFormat={}{0:N2} ₫}" Width="140"/>
                 <DataGridTextColumn Header="Trạng thái" Binding="{Binding StatusText}" Width="100"/>
             </DataGrid.Columns>
         </DataGrid>

@@ -1,0 +1,38 @@
+<Window x:Class="SelfStorage.RentalOperationsWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Width="540" SizeToContent="Height" MaxHeight="820" WindowStartupLocation="CenterOwner" ResizeMode="NoResize">
+    <ScrollViewer VerticalScrollBarVisibility="Auto">
+        <StackPanel Margin="20">
+            <TextBlock x:Name="lblHeading" FontSize="20" FontWeight="Bold"/>
+            <TextBlock x:Name="lblRental" Margin="0,10" TextWrapping="Wrap"/>
+            <TextBlock x:Name="lblAmounts" TextWrapping="Wrap" Margin="0,0,0,12"/>
+            <StackPanel x:Name="pickupPanel">
+                <TextBlock Text="Quét bằng đầu đọc QR hoặc dán nội dung mã của khách:" TextWrapping="Wrap"/>
+                <TextBox x:Name="txtQr" Padding="6" Margin="0,4" MaxLength="1000"/>
+                <Button Content="Kiểm tra QR" HorizontalAlignment="Left" Click="Verify_Click"/>
+                <TextBlock x:Name="lblVerified" TextWrapping="Wrap" Foreground="Green" Margin="0,4,0,8"/>
+            </StackPanel>
+            <StackPanel x:Name="inspectionPanel">
+                <TextBlock Text="Khấu trừ từ tiền cọc (₫, tối đa bằng tiền cọc):"/>
+                <TextBox x:Name="txtDeduction" Text="0" Padding="6" Margin="0,4,0,10"/>
+                <TextBlock Text="Biên bản kiểm tra / lý do khấu trừ:"/>
+                <TextBox x:Name="txtNotes" AcceptsReturn="True" TextWrapping="Wrap" Height="100" VerticalScrollBarVisibility="Auto" Padding="6" Margin="0,4,0,10" MaxLength="1000"/>
+                <TextBlock Text="Kho vẫn được giữ trong lúc chờ hoàn cọc." Foreground="Gray" TextWrapping="Wrap"/>
+            </StackPanel>
+            <StackPanel x:Name="refundPanel">
+                <TextBlock x:Name="lblInspection" TextWrapping="Wrap" Margin="0,0,0,12"/>
+                <TextBlock Text="Mã giao dịch hoàn tiền / số phiếu chi:"/>
+                <TextBox x:Name="txtReference" Padding="6" Margin="0,4,0,10" MaxLength="200"/>
+                <CheckBox x:Name="chkConfirmed" Margin="0,4">
+                    <TextBlock Text="Tôi đã hoàn tiền thực tế cho khách, hoặc đã đối soát khoản cọc không còn số dư." TextWrapping="Wrap"/>
+                </CheckBox>
+                <TextBlock Text="Thao tác này ghi nhận đối soát; ứng dụng không tự chuyển tiền ngân hàng. Sau xác nhận, kho được mở cho thuê lại." TextWrapping="Wrap" Foreground="Gray" Margin="0,8"/>
+            </StackPanel>
+            <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,16,0,0">
+                <Button Content="Hủy" IsCancel="True"/>
+                <Button x:Name="btnConfirm" Click="Confirm_Click"/>
+            </StackPanel>
+        </StackPanel>
+    </ScrollViewer>
+</Window>

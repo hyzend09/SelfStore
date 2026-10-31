@@ -7,7 +7,7 @@ using System.Text.Json.Serialization;
 namespace SelfStorage;
 
 /// <summary>Giữ dữ liệu cho UI và lưu nguyên tử vào SQL Server.</summary>
-public class DataStore
+public partial class DataStore
 {
     static readonly string LegacyFilePath = Path.Combine(
         Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "SelfStorage", "data.json");
@@ -33,7 +33,47 @@ public class DataStore
     public void Save()
     {
         if (_store == null) throw new InvalidOperationException("DataStore chưa kết nối SQL Server.");
+        CaptureMissingSnapshots();
         _store.Save(this);
+    }
+
+    public void Reload()
+    {
+        if (_store == null) throw new InvalidOperationException("DataStore chưa kết nối SQL Server.");
+        var loaded = _store.Load();
+        var userId = CurrentUser?.Id;
+        Users = loaded.Users;
+        Facilities = loaded.Facilities;
+        Units = loaded.Units;
+        Rentals = loaded.Rentals;
+        Revision = loaded.Revision;
+        CurrentUser = userId == null ? null : Users.FirstOrDefault(u => u.Id == userId);
+    }
+
+    public void Change(Action<DataStore> mutation)
+    {
+        Reload();
+        try { mutation(this); Save(); }
+        catch
+        {
+            // Discard unsaved edits, keeping the session usable after a conflict or SQL error.
+            try { Reload(); } catch { /* Keep the original error for the caller. */ }
+            throw;
+        }
+    }
+
+    void CaptureMissingSnapshots()
+    {
+        foreach (var rental in Rentals)
+        {
+            if (rental.UnitCodeSnapshot != "") continue;
+            var unit = Units.FirstOrDefault(u => u.Id == rental.UnitId);
+            var facility = Facilities.FirstOrDefault(f => f.Id == unit?.FacilityId);
+            if (rental.UnitCodeSnapshot == "") rental.UnitCodeSnapshot = unit?.Code ?? "";
+            if (rental.FacilityNameSnapshot == "") rental.FacilityNameSnapshot = facility?.Name ?? "";
+            if (rental.FacilityAddressSnapshot == "") rental.FacilityAddressSnapshot = facility?.Address ?? "";
+            if (rental.CustomerNameSnapshot == "") rental.CustomerNameSnapshot = Users.FirstOrDefault(u => u.Id == rental.UserId)?.FullName ?? "";
+        }
     }
 
     public static DataStore Open(string connectionString, string? legacyFilePath = null)
@@ -57,6 +97,9 @@ public class DataStore
                         throw new InvalidDataException($"Dữ liệu JSON cũ thiếu danh sách {name}.");
                 db = JsonSerializer.Deserialize<DataStore>(json)
                     ?? throw new InvalidDataException("Không đọc được dữ liệu JSON cũ.");
+                var jsonRentals = document.RootElement.GetProperty("Rentals");
+                for (int i = 0; i < db.Rentals.Count; i++)
+                    if (!jsonRentals[i].TryGetProperty("IsLegacyRental", out _)) db.Rentals[i].IsLegacyRental = true;
             }
             else db = Seed();
             db._store = store;

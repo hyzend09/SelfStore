@@ -6,13 +6,16 @@ using System.Text.Json.Serialization;
 
 namespace SelfStorage;
 
-/// <summary>Lưu dữ liệu ra file JSON. Sau này có thể thay bằng SQLite/SQL Server mà không đổi UI nhiều.</summary>
+/// <summary>Giữ dữ liệu cho UI và lưu nguyên tử vào SQL Server.</summary>
 public class DataStore
 {
-    static readonly string FilePath = Path.Combine(
+    static readonly string LegacyFilePath = Path.Combine(
         Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "SelfStorage", "data.json");
 
-    public static DataStore Instance { get; } = Load();
+    static readonly Lazy<DataStore> Default = new(() => Open(ReadConnectionString(), LegacyFilePath));
+    public static DataStore Instance => Default.Value;
+    SqlServerStore? _store;
+    internal long Revision { get; set; }
 
     public List<User> Users { get; set; } = new();
     public List<Facility> Facilities { get; set; } = new();
@@ -29,24 +32,47 @@ public class DataStore
 
     public void Save()
     {
-        Directory.CreateDirectory(Path.GetDirectoryName(FilePath)!);
-        File.WriteAllText(FilePath, JsonSerializer.Serialize(this, new JsonSerializerOptions { WriteIndented = true }));
+        if (_store == null) throw new InvalidOperationException("DataStore chưa kết nối SQL Server.");
+        _store.Save(this);
     }
 
-    static DataStore Load()
+    public static DataStore Open(string connectionString, string? legacyFilePath = null)
     {
-        try
+        var store = new SqlServerStore(connectionString);
+        store.Initialize();
+        var db = store.Load();
+        if (db.Revision == 0)
         {
-            if (File.Exists(FilePath))
+            if (db.Users.Count != 0 || db.Facilities.Count != 0 || db.Units.Count != 0 || db.Rentals.Count != 0)
             {
-                var d = JsonSerializer.Deserialize<DataStore>(File.ReadAllText(FilePath));
-                if (d != null) return d;
+                // Preserve data provisioned directly in SQL Server before the first app launch.
             }
+            else if (legacyFilePath != null && File.Exists(legacyFilePath))
+            {
+                // Không seed đè nếu JSON cũ hỏng. Giữ file gốc kể cả sau khi import.
+                var json = File.ReadAllText(legacyFilePath);
+                using var document = JsonDocument.Parse(json);
+                foreach (var name in new[] { "Users", "Facilities", "Units", "Rentals" })
+                    if (!document.RootElement.TryGetProperty(name, out var list) || list.ValueKind != JsonValueKind.Array)
+                        throw new InvalidDataException($"Dữ liệu JSON cũ thiếu danh sách {name}.");
+                db = JsonSerializer.Deserialize<DataStore>(json)
+                    ?? throw new InvalidDataException("Không đọc được dữ liệu JSON cũ.");
+            }
+            else db = Seed();
+            db._store = store;
+            db.Save();
         }
-        catch { /* file hỏng -> seed lại */ }
-        var s = Seed();
-        s.Save();
-        return s;
+        db._store = store;
+        return db;
+    }
+
+    static string ReadConnectionString()
+    {
+        var configured = Environment.GetEnvironmentVariable("SELFSTORAGE_CONNECTION_STRING");
+        if (!string.IsNullOrWhiteSpace(configured)) return configured;
+        using var settings = JsonDocument.Parse(File.ReadAllText(Path.Combine(AppContext.BaseDirectory, "appsettings.json")));
+        return settings.RootElement.GetProperty("ConnectionStrings").GetProperty("SelfStorage").GetString()
+            ?? throw new InvalidDataException("Thiếu cấu hình kết nối SelfStorage.");
     }
 
     static DataStore Seed()

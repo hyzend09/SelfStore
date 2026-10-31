@@ -1,0 +1,8 @@
+**/bin/
+**/obj/
+.vs/
+*.user
+*.suo
+*.mdf
+*.ldf
+**/appsettings.local.json

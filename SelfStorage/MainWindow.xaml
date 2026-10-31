@@ -1,0 +1,23 @@
+<Window x:Class="SelfStorage.MainWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:local="clr-namespace:SelfStorage"
+        Title="Self Storage - Khách hàng" Width="980" Height="600"
+        WindowStartupLocation="CenterScreen">
+    <DockPanel>
+        <Border DockPanel.Dock="Top" Background="#2D5BFF" Padding="12,8">
+            <DockPanel>
+                <Button DockPanel.Dock="Right" Content="Đăng xuất" Click="Logout_Click"/>
+                <TextBlock x:Name="lblUser" Foreground="White" FontSize="16" VerticalAlignment="Center"/>
+            </DockPanel>
+        </Border>
+        <TabControl x:Name="Tabs" SelectionChanged="Tabs_SelectionChanged">
+            <TabItem Header="Thuê kho">
+                <local:BrowseView x:Name="browse"/>
+            </TabItem>
+            <TabItem Header="Kho của tôi">
+                <local:MyRentalsView x:Name="mine"/>
+            </TabItem>
+        </TabControl>
+    </DockPanel>
+</Window>

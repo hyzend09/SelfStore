@@ -1,0 +1,20 @@
+﻿SelfStorage
+
+
+winexe
+C#
+.cs
+D:\SE 5\PRN 212\Project\SelfStorage (1)\SelfStorage\obj\Debug\net8.0-windows\
+SelfStorage
+none
+false
+TRACE;DEBUG;NET;NET8_0;NETCOREAPP;WINDOWS;WINDOWS7_0;NET5_0_OR_GREATER;NET6_0_OR_GREATER;NET7_0_OR_GREATER;NET8_0_OR_GREATER;NETCOREAPP1_0_OR_GREATER;NETCOREAPP1_1_OR_GREATER;NETCOREAPP2_0_OR_GREATER;NETCOREAPP2_1_OR_GREATER;NETCOREAPP2_2_OR_GREATER;NETCOREAPP3_0_OR_GREATER;NETCOREAPP3_1_OR_GREATER;WINDOWS7_0_OR_GREATER
+D:\SE 5\PRN 212\Project\SelfStorage (1)\SelfStorage\App.xaml
+101546934113
+
+15348870012
+20018489733
+AdminWindow.xaml;BookingWindow.xaml;BrowseView.xaml;FacilityEditWindow.xaml;LoginWindow.xaml;MainWindow.xaml;MyRentalsView.xaml;PaymentWindow.xaml;QrWindow.xaml;UnitEditWindow.xaml;
+
+False
+

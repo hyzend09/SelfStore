@@ -1,0 +1,26 @@
+<UserControl x:Class="SelfStorage.BrowseView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+    <DockPanel Margin="12">
+        <StackPanel DockPanel.Dock="Top" Orientation="Horizontal" Margin="0,0,0,8">
+            <TextBlock Text="Cơ sở:" VerticalAlignment="Center"/>
+            <ComboBox x:Name="cbFacility" Width="180" Margin="6,0,16,0" DisplayMemberPath="Name" SelectionChanged="Filter_Changed"/>
+            <TextBlock Text="Loại kho:" VerticalAlignment="Center"/>
+            <ComboBox x:Name="cbType" Width="140" Margin="6,0,16,0" SelectionChanged="Filter_Changed"/>
+            <CheckBox x:Name="chkAvail" Content="Chỉ hiện kho còn trống" IsChecked="True" VerticalAlignment="Center"
+                      Checked="Filter_Changed" Unchecked="Filter_Changed"/>
+        </StackPanel>
+        <Button DockPanel.Dock="Bottom" Content="Đặt kho đã chọn" HorizontalAlignment="Right" Click="Book_Click"/>
+        <DataGrid x:Name="grid" AutoGenerateColumns="False" IsReadOnly="True" SelectionMode="Single"
+                  CanUserAddRows="False" HeadersVisibility="Column">
+            <DataGrid.Columns>
+                <DataGridTextColumn Header="Cơ sở" Binding="{Binding FacilityName}" Width="*"/>
+                <DataGridTextColumn Header="Mã kho" Binding="{Binding Code}" Width="100"/>
+                <DataGridTextColumn Header="Loại" Binding="{Binding Type}" Width="110"/>
+                <DataGridTextColumn Header="Diện tích (m²)" Binding="{Binding SizeM2}" Width="110"/>
+                <DataGridTextColumn Header="Giá / tháng" Binding="{Binding PricePerMonth, StringFormat={}{0:N0} ₫}" Width="140"/>
+                <DataGridTextColumn Header="Trạng thái" Binding="{Binding StatusText}" Width="100"/>
+            </DataGrid.Columns>
+        </DataGrid>
+    </DockPanel>
+</UserControl>

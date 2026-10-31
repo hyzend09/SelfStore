@@ -1,0 +1,22 @@
+<Window x:Class="SelfStorage.PaymentWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Thanh toán" Width="360" SizeToContent="Height"
+        WindowStartupLocation="CenterOwner" ResizeMode="NoResize">
+    <StackPanel Margin="20">
+        <TextBlock Text="Số tiền cần thanh toán" Foreground="Gray"/>
+        <TextBlock x:Name="lblAmount" FontSize="26" FontWeight="Bold" Foreground="#2D5BFF" Margin="0,0,0,14"/>
+
+        <TextBlock Text="Phương thức thanh toán" Margin="0,0,0,4"/>
+        <RadioButton x:Name="rbCard" Content="Thẻ ngân hàng" IsChecked="True" Margin="0,2"/>
+        <RadioButton x:Name="rbWallet" Content="Ví điện tử (MoMo / ZaloPay)" Margin="0,2"/>
+        <RadioButton x:Name="rbTransfer" Content="Chuyển khoản" Margin="0,2"/>
+
+        <TextBlock Text="(Giả lập thanh toán - chưa kết nối cổng thật)" Foreground="Gray" FontSize="11" Margin="0,8,0,0"/>
+
+        <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,14,0,0">
+            <Button Content="Hủy" IsCancel="True"/>
+            <Button x:Name="btnPay" Content="Xác nhận thanh toán" Click="Confirm_Click" IsDefault="True"/>
+        </StackPanel>
+    </StackPanel>
+</Window>

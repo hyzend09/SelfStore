@@ -1,35 +1,67 @@
 <UserControl x:Class="SelfStorage.BrowseView"
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
-    <DockPanel Margin="12">
-        <StackPanel DockPanel.Dock="Top" Margin="0,0,0,8">
-          <WrapPanel Margin="0,0,0,6">
-            <TextBlock Text="Vị trí" VerticalAlignment="Center"/>
-            <ComboBox x:Name="cbFacility" Width="180" Margin="6,0,16,0" DisplayMemberPath="Name" SelectionChanged="Filter_Changed"/>
-            <TextBlock Text="Loại kho" VerticalAlignment="Center"/>
-            <ComboBox x:Name="cbType" Width="140" Margin="6,0,16,0" SelectionChanged="Filter_Changed"/>
-            <CheckBox x:Name="chkAvail" Content="Chỉ hiện kho còn trống" IsChecked="True" VerticalAlignment="Center"
-                      Checked="Filter_Changed" Unchecked="Filter_Changed"/>
-          </WrapPanel>
-          <WrapPanel>
-            <Label Content="Diện tích từ (m²)" Target="{Binding ElementName=txtMinArea}"/>
-            <TextBox x:Name="txtMinArea" Width="75" Margin="0,0,8,0" VerticalContentAlignment="Center"/>
-            <Label Content="Giá/tháng tối đa (₫)" Target="{Binding ElementName=txtMaxPrice}"/>
-            <TextBox x:Name="txtMaxPrice" Width="115" Margin="0,0,8,0" VerticalContentAlignment="Center"/>
-            <Button Content="Lọc và làm mới" Click="Filter_Changed"/>
-          </WrapPanel>
-          <TextBlock x:Name="lblFilterError" Foreground="#A31B1B" TextWrapping="Wrap" AutomationProperties.LiveSetting="Polite"/>
+    <DockPanel>
+        <StackPanel DockPanel.Dock="Top" Margin="0,0,0,14">
+            <TextBlock Text="Tìm kho" Style="{StaticResource TitleText}"/>
+            <TextBlock Text="Chọn kho theo vị trí, diện tích và ngân sách." Style="{StaticResource MutedText}" Margin="0,4,0,16"/>
+            <Border Style="{StaticResource Card}">
+                <StackPanel>
+                    <WrapPanel>
+                        <StackPanel Width="170" Margin="0,0,12,8">
+                            <Label Content="Vị trí" Target="{Binding ElementName=cbFacility}" Style="{StaticResource FieldLabel}"/>
+                            <ComboBox x:Name="cbFacility" DisplayMemberPath="Name" SelectionChanged="Filter_Changed"/>
+                        </StackPanel>
+                        <StackPanel Width="142" Margin="0,0,12,8">
+                            <Label Content="Loại kho" Target="{Binding ElementName=cbType}" Style="{StaticResource FieldLabel}"/>
+                            <ComboBox x:Name="cbType" SelectionChanged="Filter_Changed"/>
+                        </StackPanel>
+                        <StackPanel Width="132" Margin="0,0,12,8">
+                            <Label Content="Diện tích từ (m²)" Target="{Binding ElementName=txtMinArea}" Style="{StaticResource FieldLabel}"/>
+                            <TextBox x:Name="txtMinArea"/>
+                        </StackPanel>
+                        <StackPanel Width="156" Margin="0,0,0,8">
+                            <Label Content="Giá tối đa (₫/tháng)" Target="{Binding ElementName=txtMaxPrice}" Style="{StaticResource FieldLabel}"/>
+                            <TextBox x:Name="txtMaxPrice"/>
+                        </StackPanel>
+                    </WrapPanel>
+                    <WrapPanel Margin="0,5,0,0">
+                        <Button Content="Áp dụng bộ lọc" Click="Filter_Changed"/>
+                        <CheckBox x:Name="chkAvail" Content="Chỉ hiện kho còn trống" IsChecked="True" Margin="8,0,0,0"
+                                  Checked="Filter_Changed" Unchecked="Filter_Changed"/>
+                    </WrapPanel>
+                    <TextBlock x:Name="lblFilterError" Foreground="{StaticResource Danger}" TextWrapping="Wrap" AutomationProperties.LiveSetting="Polite">
+                        <TextBlock.Style>
+                            <Style TargetType="TextBlock">
+                                <Setter Property="Margin" Value="0,8,0,0"/>
+                                <Style.Triggers>
+                                    <Trigger Property="Text" Value=""><Setter Property="Visibility" Value="Collapsed"/></Trigger>
+                                </Style.Triggers>
+                            </Style>
+                        </TextBlock.Style>
+                    </TextBlock>
+                </StackPanel>
+            </Border>
         </StackPanel>
-        <Button DockPanel.Dock="Bottom" Content="Đặt kho đã chọn" HorizontalAlignment="Right" Click="Book_Click"/>
+        <Border DockPanel.Dock="Bottom" Style="{StaticResource Card}" Padding="14,10" Margin="0,12,0,0">
+            <DockPanel>
+                <Button x:Name="btnBook" DockPanel.Dock="Right" Content="Đặt kho đã chọn" Style="{StaticResource PrimaryButton}"
+                        Margin="12,0,0,0" IsEnabled="False" Click="Book_Click"/>
+                <StackPanel VerticalAlignment="Center">
+                    <TextBlock x:Name="lblResults" FontWeight="SemiBold" AutomationProperties.LiveSetting="Polite"/>
+                    <TextBlock x:Name="lblSelectedUnit" Style="{StaticResource MutedText}" Text="Chọn một kho trong bảng để đặt."/>
+                </StackPanel>
+            </DockPanel>
+        </Border>
         <DataGrid x:Name="grid" AutoGenerateColumns="False" IsReadOnly="True" SelectionMode="Single"
-                  CanUserAddRows="False" HeadersVisibility="Column">
+                  CanUserAddRows="False" HeadersVisibility="Column" SelectionChanged="Unit_Changed" AutomationProperties.Name="Danh sách kho">
             <DataGrid.Columns>
-                <DataGridTextColumn Header="Vị trí" Binding="{Binding FacilityName}" Width="*"/>
-                <DataGridTextColumn Header="Mã kho" Binding="{Binding Code}" Width="100"/>
-                <DataGridTextColumn Header="Loại" Binding="{Binding Type}" Width="110"/>
-                <DataGridTextColumn Header="Diện tích (m²)" Binding="{Binding SizeM2}" Width="110"/>
-                <DataGridTextColumn Header="Giá / tháng" Binding="{Binding PricePerMonth, StringFormat={}{0:N2} ₫}" Width="140"/>
-                <DataGridTextColumn Header="Trạng thái" Binding="{Binding StatusText}" Width="100"/>
+                <DataGridTextColumn Header="Mã kho" Binding="{Binding Code}" Width="92" ElementStyle="{StaticResource TableCode}"/>
+                <DataGridTextColumn Header="Vị trí" Binding="{Binding FacilityName}" Width="1.2*" MinWidth="115" ElementStyle="{StaticResource TableText}"/>
+                <DataGridTextColumn Header="Loại" Binding="{Binding Type}" Width="*" MinWidth="105" ElementStyle="{StaticResource TableText}"/>
+                <DataGridTextColumn Header="Diện tích" Binding="{Binding SizeM2, StringFormat={}{0:0.##} m²}" Width="95" ElementStyle="{StaticResource TableText}"/>
+                <DataGridTextColumn Header="Giá / tháng" Binding="{Binding PricePerMonth, StringFormat={}{0:N2} ₫}" Width="135" ElementStyle="{StaticResource TableText}"/>
+                <DataGridTemplateColumn Header="Trạng thái" Width="105" SortMemberPath="StatusText" CellTemplate="{StaticResource StatusCell}"/>
             </DataGrid.Columns>
         </DataGrid>
     </DockPanel>

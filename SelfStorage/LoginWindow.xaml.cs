@@ -10,7 +10,7 @@ public partial class LoginWindow : Window
 
     void Login_Click(object sender, RoutedEventArgs e)
     {
-        lblMsg.Foreground = System.Windows.Media.Brushes.Red;
+        lblMsg.SetResourceReference(System.Windows.Controls.TextBlock.ForegroundProperty, "Danger");
         bool loggedIn = false;
         if (!UiActions.Try(() => loggedIn = _db.Login(txtLoginEmail.Text, txtLoginPass.Password))) return;
         if (!loggedIn) { lblMsg.Text = "Sai email hoặc mật khẩu."; return; }
@@ -26,9 +26,13 @@ public partial class LoginWindow : Window
         var email = txtRegEmail.Text.Trim().ToLower();
         var pass = txtRegPass.Password;
 
-        lblMsg.Foreground = System.Windows.Media.Brushes.Red;
+        lblMsg.SetResourceReference(System.Windows.Controls.TextBlock.ForegroundProperty, "Danger");
         if (!UiActions.Try(() => _db.Register(name, email, pass))) return;
-        lblMsg.Foreground = System.Windows.Media.Brushes.Green;
-        lblMsg.Text = "Đăng ký thành công! Hãy chuyển sang tab Đăng nhập.";
+        txtLoginEmail.Text = email;
+        txtRegPass.Clear();
+        AccountTabs.SelectedIndex = 0;
+        lblMsg.SetResourceReference(System.Windows.Controls.TextBlock.ForegroundProperty, "Accent");
+        lblMsg.Text = "Đã tạo tài khoản. Nhập mật khẩu để đăng nhập.";
+        txtLoginPass.Focus();
     }
 }

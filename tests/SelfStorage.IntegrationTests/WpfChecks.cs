@@ -14,6 +14,10 @@ internal static class WpfChecks
         var thread = new Thread(() =>
         {
             var application = new Application { ShutdownMode = ShutdownMode.OnExplicitShutdown };
+            application.Resources.MergedDictionaries.Add(new ResourceDictionary
+            {
+                Source = new Uri("/SelfStorage;component/Theme.xaml", UriKind.Relative)
+            });
             var unhandled = new List<Exception>();
             application.DispatcherUnhandledException += (_, e) => { unhandled.Add(e.Exception); e.Handled = true; };
             application.Startup += async (_, _) =>

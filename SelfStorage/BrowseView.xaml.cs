@@ -73,6 +73,14 @@ public partial class BrowseView : UserControl
         var units = lblFilterError.Text.Length == 0 ? q.OrderBy(u => u.FacilityId).ThenBy(u => u.PricePerMonth).ToList() : [];
         grid.ItemsSource = units;
         grid.SelectedItem = units.FirstOrDefault(u => u.Id == selectedId);
+        lblResults.Text = units.Count == 0 ? "Không tìm thấy kho phù hợp" : $"{units.Count:N0} kho phù hợp";
+    }
+
+    void Unit_Changed(object sender, SelectionChangedEventArgs e)
+    {
+        var unit = grid.SelectedItem as StorageUnit;
+        btnBook.IsEnabled = unit?.IsAvailable == true;
+        lblSelectedUnit.Text = unit == null ? "Chọn một kho trong bảng để đặt." : $"{unit.Code} · {unit.FacilityName} · {unit.StatusText}";
     }
 
     void Book_Click(object sender, RoutedEventArgs e)

@@ -15,7 +15,7 @@ public partial class AdminWindow : Window
     {
         InitializeComponent();
         dpRevenueMonth.SelectedDate = DateTime.Today;
-        lblUser.Text = $"Admin: {_db.CurrentUser?.FullName}";
+        lblUser.Text = _db.CurrentUser?.FullName;
         ReloadAll();
         _ready = true;
         _holdTimer.Tick += (_, _) =>
@@ -84,8 +84,18 @@ public partial class AdminWindow : Window
         int rented = _db.Rentals.Count(r => r.IsOpen && r.PaidAt != null && r.WasHandedOver);
         decimal revenue = _db.Rentals.Where(r => r.PaidAtLocal is DateTime paid && paid.Year == month.Year && paid.Month == month.Month)
             .Sum(r => r.RentFee);
-        lblStats.Text = $"Còn trống: {free}  |  Đang thuê: {rented}  |  Phí thuê thu trong tháng {month:MM/yyyy}: {revenue:N2} ₫";
+        lblAvailable.Text = free.ToString("N0");
+        lblRented.Text = rented.ToString("N0");
+        lblStats.Text = $"{revenue:N2} ₫";
+        lblRevenuePeriod.Text = $"Tháng {month:MM/yyyy}";
+        var pending = _db.Rentals.Where(r => r.IsOpen && r.PaidAt != null).ToList();
+        lblPickup.Text = pending.Count(r => !r.WasHandedOver && !r.MissedPickup && r.ReturnRequestedAt == null).ToString("N0");
+        lblMissed.Text = pending.Count(r => r.MissedPickup && r.ReturnRequestedAt == null).ToString("N0");
+        lblInspectionCount.Text = pending.Count(r => r.ReturnRequestedAt != null && r.InspectedAt == null).ToString("N0");
+        lblRefundCount.Text = pending.Count(r => r.InspectedAt != null && r.RefundedAt == null).ToString("N0");
     }
+
+    void OpenRentals_Click(object sender, RoutedEventArgs e) => Workspace.SelectedItem = RentalsTab;
 
     void RevenueMonth_Changed(object sender, SelectionChangedEventArgs e) { if (_ready) LoadStats(); }
 

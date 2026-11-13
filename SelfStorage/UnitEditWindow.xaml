@@ -1,24 +1,35 @@
 <Window x:Class="SelfStorage.UnitEditWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-        Width="380" SizeToContent="Height" WindowStartupLocation="CenterOwner" ResizeMode="NoResize">
-    <StackPanel Margin="20">
-        <TextBlock Text="Vị trí"/>
-        <ComboBox x:Name="cbFacility" DisplayMemberPath="Name" Margin="0,2,0,8"/>
-        <TextBlock Text="Mã kho"/>
-        <TextBox x:Name="txtCode" Margin="0,2,0,8" Padding="4"/>
-        <TextBlock Text="Loại kho (chọn hoặc gõ mới)"/>
-        <ComboBox x:Name="cbType" IsEditable="True" Margin="0,2,0,8"/>
-        <TextBlock Text="Diện tích (m²)"/>
-        <TextBox x:Name="txtSize" Margin="0,2,0,8" Padding="4"/>
-        <TextBlock Text="Giá thuê / tháng (₫)"/>
-        <TextBox x:Name="txtPrice" Margin="0,2,0,8" Padding="4"/>
-        <CheckBox x:Name="chkAvail" Content="Sẵn sàng cho thuê (bỏ chọn để đưa vào bảo trì)" IsChecked="True" Margin="0,2,0,0"/>
-        <TextBlock x:Name="lblNote" Foreground="Gray" FontSize="11" TextWrapping="Wrap"/>
-        <TextBlock x:Name="lblError" Foreground="Red" TextWrapping="Wrap" Margin="0,8,0,0"/>
-        <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,12,0,0">
-            <Button Content="Hủy" IsCancel="True"/>
-            <Button Content="Lưu" Click="Save_Click" IsDefault="True"/>
+        Width="482" SizeToContent="Height" MaxHeight="700" Style="{StaticResource DialogWindow}"
+        WindowStartupLocation="CenterOwner" ResizeMode="NoResize">
+    <ScrollViewer VerticalScrollBarVisibility="Auto">
+        <StackPanel Margin="25">
+            <TextBlock Text="Thông tin kho" Style="{StaticResource TitleText}" Margin="0,0,0,18"/>
+            <Label Content="Vị trí" Target="{Binding ElementName=cbFacility}" Style="{StaticResource FieldLabel}"/>
+            <ComboBox x:Name="cbFacility" DisplayMemberPath="Name" Margin="0,0,0,12"/>
+            <Label Content="Mã kho" Target="{Binding ElementName=txtCode}" Style="{StaticResource FieldLabel}"/>
+            <TextBox x:Name="txtCode" Margin="0,0,0,12"/>
+            <Label Content="Loại kho (chọn hoặc gõ mới)" Target="{Binding ElementName=cbType}" Style="{StaticResource FieldLabel}"/>
+            <ComboBox x:Name="cbType" IsEditable="True" Margin="0,0,0,12"/>
+            <Grid Margin="0,0,0,14">
+                <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
+                <StackPanel Margin="0,0,12,0">
+                    <Label Content="Diện tích (m²)" Target="{Binding ElementName=txtSize}" Style="{StaticResource FieldLabel}"/>
+                    <TextBox x:Name="txtSize"/>
+                </StackPanel>
+                <StackPanel Grid.Column="1">
+                    <Label Content="Giá thuê / tháng (₫)" Target="{Binding ElementName=txtPrice}" Style="{StaticResource FieldLabel}"/>
+                    <TextBox x:Name="txtPrice"/>
+                </StackPanel>
+            </Grid>
+            <CheckBox x:Name="chkAvail" Content="Sẵn sàng cho thuê (bỏ chọn để đưa vào bảo trì)" IsChecked="True"/>
+            <TextBlock x:Name="lblNote" Style="{StaticResource MutedText}"/>
+            <TextBlock x:Name="lblError" Foreground="{StaticResource Danger}" TextWrapping="Wrap" Margin="0,6,0,0" AutomationProperties.LiveSetting="Polite"/>
+            <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,14,0,0">
+                <Button Content="Hủy" IsCancel="True"/>
+                <Button Content="Lưu kho" Click="Save_Click" IsDefault="True" Style="{StaticResource PrimaryButton}" Margin="0"/>
+            </StackPanel>
         </StackPanel>
-    </StackPanel>
+    </ScrollViewer>
 </Window>

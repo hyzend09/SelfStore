@@ -59,11 +59,13 @@ Khi database mới, chưa có dữ liệu JSON cũ, ứng dụng tạo 3 vị tr
 
 Khóa ngoại bảo vệ quan hệ dữ liệu. Email, tên cơ sở và mã kho trong từng cơ sở có ràng buộc duy nhất. Mỗi kho có tối đa một đơn đang giữ chỗ hoặc chưa trả. Tiền dùng `decimal(18,2)`, ngày giờ dùng `datetime2`, nội dung tiếng Việt dùng `nvarchar`.
 
-Ở lần mở đầu tiên của database trống, nếu có `%APPDATA%\SelfStorage\data.json`, ứng dụng nhập dữ liệu đó trong một transaction và giữ nguyên file JSON. Những lần mở sau chỉ dùng SQL Server. JSON hỏng hoặc không thỏa ràng buộc sẽ báo lỗi và không seed đè; sửa file rồi mở lại để thử nhập lại. Dữ liệu đã có sẵn trong SQL Server được giữ lại.
+Ở lần mở đầu tiên của database trống, ứng dụng tìm dữ liệu cũ tại `%APPDATA%\SelfStorage\data.json`. Có thể chỉ định file khác bằng `SELFSTORAGE_LEGACY_JSON_PATH`. Ứng dụng nhập dữ liệu trong một transaction và giữ nguyên file nguồn. Nếu file hỏng hoặc vi phạm ràng buộc, sửa file rồi mở lại để thử nhập lại. Những lần mở sau dùng dữ liệu đã lưu trong SQL Server.
 
-Ứng dụng tự nâng schema phiên bản 1 hoặc 2 lên phiên bản 3 khi mở, hoặc quản trị viên chạy lại `database/Schema.sql` trước. Chỉ dùng bản ứng dụng mới sau khi nâng schema. Dữ liệu thanh toán lịch sử tiếp tục được đọc từ `Rentals`. Bảng `Payments` ghi mã giao dịch của các thanh toán mới. QR, ảnh chụp thông tin đơn và biên bản đối soát hiện có được giữ lại. Đơn cũ đang thuê vẫn có thể gửi yêu cầu trả.
+Ứng dụng tự nâng schema phiên bản 1–3 lên phiên bản 4 khi mở. Quản trị viên cũng có thể chạy trước `database/Schema.sql`. Các khoản thanh toán mới dùng giờ UTC của SQL Server và được quy đổi sang giờ địa phương khi thống kê. Các mốc thanh toán cũ giữ nguyên giá trị giờ địa phương đã lưu. QR, thông tin đơn và biên bản đối soát hiện có được giữ lại.
 
-Nút làm mới, chuyển tab khách hàng và đăng nhập đọc lại dữ liệu SQL Server. Mỗi thao tác ghi tải dữ liệu mới trước, đồng bộ thay đổi trong một transaction và kiểm tra `Revision`. Lỗi SQL/xung đột không đóng ứng dụng; thay đổi chưa lưu được bỏ, dữ liệu được tải lại để người dùng kiểm tra và thử lại. Cửa sổ sửa kho/cơ sở dùng bản sao và phát hiện thay đổi từ phiên khác. Các thay đổi trực tiếp bằng SQL ngoài ứng dụng phải tăng `StoreState.Revision` trong cùng transaction.
+Nút làm mới, chuyển tab khách hàng và đăng nhập đọc lại dữ liệu SQL Server. Mỗi thao tác ghi tải dữ liệu mới trước, đồng bộ thay đổi trong một transaction và kiểm tra `Revision`. Khi có xung đột, ứng dụng bỏ thay đổi chưa lưu và tải lại dữ liệu. Cửa sổ sửa kho dùng bản sao để phát hiện thay đổi từ phiên khác. Các thay đổi trực tiếp vào dữ liệu nghiệp vụ bằng SQL phải tăng `StoreState.Revision` trong cùng transaction.
+
+Mật khẩu mới dùng PBKDF2-HMAC-SHA256 với salt riêng. Tài khoản cũ được nâng cấp hash khi đăng nhập thành công. Danh sách người dùng bỏ cột hash và phiên Customer chỉ nhận email của chính mình. WPF vẫn dùng kết nối trực tiếp tới SQL Server, vì vậy quyền của tài khoản kết nối SQL là ranh giới truy cập dữ liệu của bản demo.
 
 ## Phạm vi WPF
 
@@ -86,6 +88,8 @@ Nút làm mới, chuyển tab khách hàng và đăng nhập đọc lại dữ l
 - SQL Server dùng giờ UTC để kiểm tra 15 phút. Thao tác đọc/ghi tiếp theo ghi trạng thái hết hạn và mở kho. Màn hình đang hiển thị đơn giữ chỗ tự làm mới sau khi đến hạn.
 - Mỗi đơn có tối đa một khoản thanh toán. Gửi lại cùng mã giao dịch cho cùng đơn trả về QR đã cấp. QR không thể bàn giao hai lần. Đơn đang thuê quá ngày kết thúc vẫn đi qua luồng trả kho, với phí phát sinh do Admin ghi trong biên bản.
 - Khi trả kho, hệ thống yêu cầu QR trùng với mã đã cấp. Đơn từ dữ liệu cũ chưa từng có QR được kiểm tra theo mã đơn và thông tin khách.
+- **Khách không đến nhận kho.** Sau ngày kết thúc, Admin chọn đơn và bấm **Xử lý đơn ngoại lệ**. Đơn chuyển thẳng sang **Chờ hoàn cọc** với toàn bộ tiền cọc. Phí thuê đã thu giữ nguyên. Kho mở lại khi Admin xác nhận đối soát.
+- **Khách đang thuê bị khóa tài khoản.** Admin dùng **Xử lý đơn ngoại lệ** để chuyển đơn sang **Chờ kiểm tra trả kho**. Nếu khách không xuất trình được QR, Admin phải đối chiếu danh tính và mã đơn, rồi xác nhận trên biên bản kiểm tra. Đơn tiếp tục qua bước đối soát cọc như bình thường.
 
 Admin có thể xem và khóa/mở khóa Customer. Thống kê hiển thị số kho trống, kho đang thuê và phí thuê đã thu trong tháng chọn theo ngày thanh toán. Tiền cọc và khoản phí phát sinh nằm ngoài chỉ số phí thuê.
 
@@ -98,6 +102,6 @@ dotnet run --project tests/SelfStorage.IntegrationTests --configuration Release
 
 Bộ kiểm tra tích hợp dùng SQL Server LocalDB, tự tạo và xóa các database riêng mang tên `SelfStorage_Test_<guid>`. Kiểm tra dữ liệu mẫu, CRUD, đăng ký, tiền/ngày giờ, khóa ngoại, email trùng, rollback, lưu/đặt kho đồng thời, nhập JSON, nâng schema cũ và toàn bộ trạng thái nhận/trả/đối soát cọc. Kiểm tra WPF chạy các cửa sổ thật trên luồng STA: sửa giá, hủy thanh toán khi đang xử lý, đặt kho qua thanh toán/QR, tải lại dữ liệu từ phiên khác, bàn giao, kiểm tra và xác nhận hoàn cọc.
 
-Có thể đặt `SELFSTORAGE_TEST_CONNECTION_STRING` để dùng SQL Server khác; tài khoản kiểm tra cần quyền tạo/xóa database thử nghiệm. Các kiểm tra WPF cần phiên Windows desktop.
+Có thể đặt `SELFSTORAGE_TEST_CONNECTION_STRING` để dùng SQL Server khác. Tài khoản kiểm tra cần quyền tạo/xóa database thử nghiệm. Các kiểm tra WPF cần phiên Windows desktop và tự đặt đường dẫn JSON riêng để fixture bắt đầu từ dữ liệu mẫu.
 
 Phần thanh toán vẫn là mô phỏng; xác nhận hoàn cọc là ghi nhận tiền đã hoàn bên ngoài, chưa có cổng thanh toán/chuyển tiền thật. Đơn đã thanh toán được kết thúc bằng luồng trả kho.

@@ -2,7 +2,7 @@ using System.Windows;
 
 namespace SelfStorage;
 
-public enum RentalOperation { Receive, Inspect, Refund }
+public enum RentalOperation { Receive, Inspect, Refund, StartReturn }
 
 public partial class RentalOperationsWindow : Window
 {
@@ -17,7 +17,13 @@ public partial class RentalOperationsWindow : Window
         InitializeComponent();
         var rental = _db.Rentals.Single(r => r.Id == rentalId);
         _requiresReturnQr = rental.RequiresReturnQr;
-        Title = lblHeading.Text = operation switch { RentalOperation.Receive => "Bàn giao nhận kho", RentalOperation.Inspect => "Kiểm tra trả kho", _ => "Xác nhận hoàn cọc" };
+        Title = lblHeading.Text = operation switch
+        {
+            RentalOperation.Receive => "Bàn giao nhận kho",
+            RentalOperation.Inspect => "Kiểm tra trả kho",
+            RentalOperation.StartReturn => "Xử lý đơn ngoại lệ",
+            _ => "Xác nhận hoàn cọc"
+        };
         lblRental.Text = $"Đơn #{rental.Id} • {rental.CustomerName}\n{rental.FacilityName} • {rental.UnitCode}\n{rental.StartDate:dd/MM/yyyy} – {rental.EndDate:dd/MM/yyyy}\nTrạng thái: {rental.StatusText}";
         lblAmounts.Text = $"Cọc: {rental.Deposit:N2} ₫ • Khấu trừ: {rental.Deduction:N2} ₫\n" +
             $"Phí phát sinh: {rental.ExtraFee:N2} ₫ • Vượt cọc: {Math.Max(0, rental.ExtraFee - rental.Deduction):N2} ₫\n" +
@@ -27,8 +33,27 @@ public partial class RentalOperationsWindow : Window
             ? Visibility.Visible : Visibility.Collapsed;
         btnVerify.Visibility = operation == RentalOperation.Receive ? Visibility.Visible : Visibility.Collapsed;
         inspectionPanel.Visibility = operation == RentalOperation.Inspect ? Visibility.Visible : Visibility.Collapsed;
+        chkIdentityVerified.Visibility = _requiresReturnQr && _db.IsCustomerLocked(rental)
+            ? Visibility.Visible : Visibility.Collapsed;
         refundPanel.Visibility = operation == RentalOperation.Refund ? Visibility.Visible : Visibility.Collapsed;
-        btnConfirm.Content = operation switch { RentalOperation.Receive => "Xác nhận đã nhận kho", RentalOperation.Inspect => "Lưu biên bản", _ => "Đã đối soát và đóng đơn" };
+        btnConfirm.Content = operation switch
+        {
+            RentalOperation.Receive => "Xác nhận đã nhận kho",
+            RentalOperation.Inspect => "Lưu biên bản",
+            RentalOperation.StartReturn => "Bắt đầu xử lý",
+            _ => "Đã đối soát và đóng đơn"
+        };
+        if (operation == RentalOperation.StartReturn)
+        {
+            lblStartReturn.Visibility = Visibility.Visible;
+            bool eligible = rental.CanStartReturn && (rental.MissedPickup || _db.IsCustomerLocked(rental));
+            btnConfirm.IsEnabled = eligible;
+            lblStartReturn.Text = !eligible
+                ? "Thao tác dành cho đơn quá hạn chưa nhận kho hoặc đơn đã bàn giao của khách bị khóa."
+                : rental.MissedPickup
+                    ? $"Kho chưa bàn giao. Đơn sẽ chuyển sang chờ đối soát hoàn toàn bộ cọc ({rental.Deposit:N2} ₫)."
+                    : "Đơn sẽ chuyển sang chờ kiểm tra trả kho. Hãy tiếp tục kiểm tra và đối soát cọc sau khi khách trả kho.";
+        }
     }
 
     void Verify_Click(object sender, RoutedEventArgs e)
@@ -45,7 +70,8 @@ public partial class RentalOperationsWindow : Window
     void Confirm_Click(object sender, RoutedEventArgs e)
     {
         lblValidation.Text = "";
-        if (_operation == RentalOperation.Inspect && _requiresReturnQr && string.IsNullOrWhiteSpace(txtQr.Text))
+        bool identityVerified = chkIdentityVerified.Visibility == Visibility.Visible && chkIdentityVerified.IsChecked == true;
+        if (_operation == RentalOperation.Inspect && _requiresReturnQr && !identityVerified && string.IsNullOrWhiteSpace(txtQr.Text))
         {
             lblValidation.Text = "Quét hoặc nhập QR của đơn trước khi lưu biên bản trả kho.";
             txtQr.Focus();
@@ -61,9 +87,11 @@ public partial class RentalOperationsWindow : Window
             {
                 case RentalOperation.Receive: _db.ReceiveRental(txtQr.Text, _rentalId); break;
                 case RentalOperation.Inspect:
-                    _db.InspectReturn(_rentalId, decimal.Parse(txtDeduction.Text), txtNotes.Text, txtQr.Text, chkMaintenance.IsChecked == true);
+                    _db.InspectReturn(_rentalId, decimal.Parse(txtDeduction.Text), txtNotes.Text, txtQr.Text,
+                        chkMaintenance.IsChecked == true, identityVerified);
                     break;
                 case RentalOperation.Refund: _db.ConfirmRefund(_rentalId, txtReference.Text); break;
+                case RentalOperation.StartReturn: _db.StartAdminReturn(_rentalId); break;
             }
         });
         if (succeeded) DialogResult = true;

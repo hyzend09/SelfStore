@@ -11,14 +11,10 @@ public partial class LoginWindow : Window
     void Login_Click(object sender, RoutedEventArgs e)
     {
         lblMsg.Foreground = System.Windows.Media.Brushes.Red;
-        if (!UiActions.Try(_db.Reload)) return;
-        var email = txtLoginEmail.Text.Trim();
-        var hash = DataStore.Hash(txtLoginPass.Password);
-        var user = _db.Users.FirstOrDefault(u => u.Email.Equals(email, StringComparison.OrdinalIgnoreCase) && u.PasswordHash == hash);
-
-        if (user == null) { lblMsg.Text = "Sai email hoặc mật khẩu."; return; }
-        if (!user.IsActive) { lblMsg.Text = "Tài khoản đã bị khóa. Hãy liên hệ quản trị viên."; return; }
-        _db.CurrentUser = user;
+        bool loggedIn = false;
+        if (!UiActions.Try(() => loggedIn = _db.Login(txtLoginEmail.Text, txtLoginPass.Password))) return;
+        if (!loggedIn) { lblMsg.Text = "Sai email hoặc mật khẩu."; return; }
+        var user = _db.CurrentUser!;
         Window next = user.Role == "Admin" ? new AdminWindow() : new MainWindow();
         next.Show();
         Close();

@@ -13,15 +13,15 @@ internal static class WorkflowChecks
         customer.CurrentUser = customer.Users.Single(u => u.Id == 2);
         admin.CurrentUser = admin.Users.Single(u => u.Id == 1);
         Expect(() => customer.Register("Test", "@", "123456"), "registration rejects invalid email");
-        Expect(() => customer.SaveFacility(new Facility { Name = "unauthorized" }, null), "customer cannot administer catalog");
+        Expect(() => customer.DeleteUnit(1), "customer cannot administer catalog");
         var draft = Clone(admin.Units[0]);
         draft.PricePerMonth = 123456.78m;
         admin.SaveUnit(draft, admin.Units[0]);
-        Expect(() => customer.Book(1, DateTime.Today, 1, 300000, "Thẻ ngân hàng"), "booking rechecks quoted price");
-        var rental = customer.Book(1, DateTime.Today, 1, 123456.78m, "Thẻ ngân hàng");
+        Expect(() => customer.CreateHold(1, DateTime.Today, 1, 300000), "booking rechecks quoted price");
+        var rental = BookPaid(customer, 1, DateTime.Today, 1, 123456.78m, "Thẻ ngân hàng");
         Check(rental.StatusText == "Chờ nhận kho" && rental.UnitCodeSnapshot != "" && rental.CustomerNameSnapshot != "", "booking reserves unit and freezes history");
         Check(!DataStore.Open(connection).Units.Single(u => u.Id == 1).IsAvailable, "reserved unit cannot be booked again");
-        Expect(() => customer.Book(1, DateTime.Today, 1, rental.Deposit, "Thẻ ngân hàng"), "duplicate booking rejected");
+        Expect(() => customer.CreateHold(1, DateTime.Today, 1, rental.Deposit), "duplicate booking rejected");
         Expect(() => customer.RequestReturn(rental.Id), "cannot return before pickup");
         Expect(() => customer.ReceiveRental(rental.QrContent, rental.Id), "pickup requires admin");
         Expect(() => admin.ReceiveRental("SELFSTORAGE|forged", rental.Id), "forged QR rejected");
@@ -34,7 +34,7 @@ internal static class WorkflowChecks
 
         customer.Register("Người khác", "other@example.com", "123456");
         var other = DataStore.Open(connection);
-        other.CurrentUser = other.Users.Single(u => u.Email == "other@example.com");
+        Check(other.Login("other@example.com", "123456"), "new customer authenticates");
         Expect(() => other.RequestReturn(rental.Id), "cannot return another customer's rental");
         Expect(() => admin.InspectReturn(rental.Id, 0, "OK", rental.QrContent, false), "cannot inspect before return request");
         customer.RequestReturn(rental.Id);
@@ -44,7 +44,7 @@ internal static class WorkflowChecks
         Expect(() => customer.RequestReturn(rental.Id), "duplicate return request rejected");
         Expect(() => customer.InspectReturn(rental.Id, 0, "OK", rental.QrContent, false), "inspection requires admin");
         Expect(() => admin.InspectReturn(rental.Id, -1, "bad", rental.QrContent, false), "negative deduction rejected");
-        Expect(() => admin.InspectReturn(rental.Id, 0, "OK"), "old inspection overload cannot bypass a required QR");
+
         Expect(() => admin.InspectReturn(rental.Id, 0.001m, "bad", rental.QrContent, false), "deduction precision validated");
         Expect(() => admin.InspectReturn(rental.Id, 10, "", rental.QrContent, false), "inspection report is required");
         Expect(() => admin.ConfirmRefund(rental.Id, "premature"), "cannot settle before inspection");
@@ -62,7 +62,7 @@ internal static class WorkflowChecks
         var closed = completed.Rentals.Single();
         Check(closed.IsReturned && closed.ReturnedAt != null && closed.RefundedAt != null && closed.RefundedByUserId == 1
             && closed.RefundReference == "BANK-0001" && completed.Units.Single(u => u.Id == 1).IsAvailable, "settlement audit closes rental and releases unit atomically");
-        var next = customer.Book(1, DateTime.Today, 1, 123456.78m, "Ví điện tử");
+        var next = BookPaid(customer, 1, DateTime.Today, 1, 123456.78m, "Ví điện tử");
         Expect(() => admin.ConfirmRefund(rental.Id, "duplicate"), "duplicate refund rejected after rebooking");
         Check(!DataStore.Open(connection).Units.Single(u => u.Id == 1).IsAvailable, "old refund cannot release a new booking");
 
@@ -71,7 +71,7 @@ internal static class WorkflowChecks
             var unitId = fullDeduction ? 3 : 2;
             customer.Reload();
             var price = customer.Units.Single(u => u.Id == unitId).PricePerMonth;
-            var item = customer.Book(unitId, DateTime.Today, 1, price, "Chuyển khoản");
+            var item = BookPaid(customer, unitId, DateTime.Today, 1, price, "Chuyển khoản");
             admin.ReceiveRental(item.QrContent, item.Id);
             customer.RequestReturn(item.Id);
             admin.InspectReturn(item.Id, fullDeduction ? item.Deposit : 0, fullDeduction ? "Hư hỏng bằng tiền cọc" : "Kho tốt", item.QrContent, false);
@@ -81,17 +81,18 @@ internal static class WorkflowChecks
                 fullDeduction ? "zero refund still requires explicit settlement" : "full deposit refund");
         }
 
-        var future = customer.Book(4, DateTime.Today.AddDays(5), 1, customer.Units.Single(u => u.Id == 4).PricePerMonth, "Thẻ ngân hàng");
+        var future = BookPaid(customer, 4, DateTime.Today.AddDays(5), 1, customer.Units.Single(u => u.Id == 4).PricePerMonth, "Thẻ ngân hàng");
         Expect(() => admin.ReceiveRental(future.QrContent, future.Id), "pickup before start date rejected");
-        Expect(() => customer.Book(5, DateTime.Today.AddYears(6), 1, 650000, "Thẻ ngân hàng"), "booking date bounded");
+        Expect(() => customer.CreateHold(5, DateTime.Today.AddYears(6), 1, 650000), "booking date bounded");
         var originalUnit = Clone(admin.Units.Single(u => u.Id == 2));
         var changedUnit = Clone(originalUnit);
         changedUnit.Code = "RENAMED"; changedUnit.PricePerMonth = 345678.90m;
         admin.SaveUnit(changedUnit, originalUnit);
         var originalFacility = Clone(admin.Facilities.Single(f => f.Id == originalUnit.FacilityId));
-        var changedFacility = Clone(originalFacility);
+        admin.Reload();
+        var changedFacility = admin.Facilities.Single(f => f.Id == originalFacility.Id);
         changedFacility.Name = "Cơ sở đổi tên"; changedFacility.Address = "Địa chỉ đổi";
-        admin.SaveFacility(changedFacility, originalFacility);
+        admin.Save();
         var history = DataStore.Open(connection).Rentals.Single(r => r.UnitId == 2);
         Check(history.UnitCode == originalUnit.Code && history.FacilityName == originalFacility.Name
             && history.FacilityAddressSnapshot == originalFacility.Address, "history does not follow later unit/facility edits");
@@ -105,7 +106,7 @@ internal static class WorkflowChecks
         stale.CurrentUser = stale.Users.Single(u => u.Id == 2);
         customer.Register("Fresh", "fresh@example.com", "123456");
         stale.Reload();
-        Check(stale.Users.Any(u => u.Email == "fresh@example.com") && stale.CurrentUser?.Id == 2, "refresh reads SQL and preserves session");
+        Check(stale.Users.Any(u => u.FullName == "Fresh") && stale.CurrentUser?.Id == 2, "refresh reads SQL and preserves session");
 
         var left = DataStore.Open(connection); left.CurrentUser = left.Users.Single(u => u.Id == 2);
         var right = DataStore.Open(connection); right.CurrentUser = right.Users.Single(u => u.Id == 2);
@@ -134,13 +135,13 @@ internal static class WorkflowChecks
         migrated.CurrentUser = migrated.Users.Single(u => u.Id == 2);
         migrated.RequestReturn(1);
         Check(DataStore.Open(legacyConnection).Rentals[0].ReturnRequestedAt != null, "legacy active rental can request return");
-        Check((int)Scalar(legacyConnection, "SELECT SchemaVersion FROM dbo.StoreState") == 3, "schema upgraded to version 3");
+        Check((int)Scalar(legacyConnection, "SELECT SchemaVersion FROM dbo.StoreState") == 4, "schema upgraded to version 4");
         Check((int)Scalar(legacyConnection, "SELECT COUNT(*) FROM dbo.Payments") == 0 && migrated.Rentals.All(r => r.PaidAt != null),
             "migration preserves historical paid dates without inventing transaction codes");
         migrated.CurrentUser = migrated.Users.Single(u => u.Id == 1);
-        Expect(() => migrated.InspectReturn(1, 0, "Kho cũ"), "legacy rental with an existing QR still requires that QR");
+        Expect(() => migrated.InspectReturn(1, 0, "Kho cũ", null, false), "legacy rental with an existing QR still requires that QR");
         Sql(legacyConnection, "UPDATE dbo.Rentals SET QrContent = N'' WHERE Id = 1; UPDATE dbo.StoreState SET Revision = Revision + 1;");
-        migrated.InspectReturn(1, 0, "Đơn cũ chưa từng có QR");
+        migrated.InspectReturn(1, 0, "Đơn cũ chưa từng có QR", null, false);
         Check(migrated.Rentals.Single(r => r.Id == 1).InspectedAt != null, "legacy rental without QR remains returnable");
 
         decimal Price(int id) => customer.Units.Single(u => u.Id == id).PricePerMonth;
@@ -163,6 +164,9 @@ internal static class WorkflowChecks
         var concurrentPayments = await Task.WhenAll(Task.Run(() => Pay(left)), Task.Run(() => Pay(right)));
         var paidHold = concurrentPayments[0];
         Check(concurrentPayments.All(r => r.QrContent == paidHold.QrContent), "simultaneous retries return the same committed payment");
+        Check(DataStore.Open(connection).Rentals.Single(r => r.Id == paidHold.Id).PaidAtIsUtc &&
+            (int)Scalar(connection, $"SELECT COUNT(*) FROM dbo.Payments p JOIN dbo.Rentals r ON r.Id = p.Id WHERE p.Id = {paidHold.Id} AND p.PaidAt = r.PaidAt AND ABS(DATEDIFF(second, p.PaidAt, SYSUTCDATETIME())) < 60") == 1,
+            "new rental and payment share a UTC timestamp");
         Check(paidHold.QrContent != "" && paidHold.QrContent == customer.PayHeldRental(validHold.Id, "Chuyển khoản", code).QrContent,
             "retry returns the same payment and QR");
         Expect(() => customer.PayHeldRental(otherHold.Id, "Chuyển khoản", code), "same transaction cannot pay a different hold");
@@ -182,9 +186,33 @@ internal static class WorkflowChecks
         Check(closedDamage.ExtraFee - closedDamage.Deduction == 25 && closedDamage.RefundAmount == 0 &&
             admin.Units.Single(u => u.Id == 7).StatusText == "Bảo trì", "damage above deposit is recorded and unit enters maintenance");
 
+        var missed = BookPaid(customer, 9, DateTime.Today, 1, Price(9), "Chuyển khoản");
+        Expect(() => admin.StartAdminReturn(missed.Id), "admin cannot close an uncollected order before its deadline");
+        Sql(connection, $"UPDATE dbo.Rentals SET StartDate = DATEADD(month, -2, GETDATE()) WHERE Id = {missed.Id}; UPDATE dbo.StoreState SET Revision = Revision + 1;");
+        Expect(() => admin.ReceiveRental(missed.QrContent, missed.Id), "missed pickup cannot be handed over");
+        Expect(() => customer.StartAdminReturn(missed.Id), "exception handling requires admin");
+        admin.StartAdminReturn(missed.Id);
+        var pendingNoShow = admin.Rentals.Single(r => r.Id == missed.Id);
+        Check(pendingNoShow.ReceivedAt == null && pendingNoShow.RefundAmount == missed.Deposit &&
+            pendingNoShow.InspectedAt != null && !admin.Units.Single(u => u.Id == 9).IsAvailable,
+            "missed pickup goes directly to full deposit settlement and keeps unit held");
+        Expect(() => admin.StartAdminReturn(missed.Id), "missed pickup cannot be processed twice");
+        admin.ConfirmRefund(missed.Id, "NO-SHOW-01");
+        Check(admin.Units.Single(u => u.Id == 9).IsAvailable, "settling missed pickup releases unit");
+
+        var lockedRental = BookPaid(customer, 10, DateTime.Today, 1, Price(10), "Chuyển khoản");
+        admin.ReceiveRental(lockedRental.QrContent, lockedRental.Id);
+        Expect(() => admin.StartAdminReturn(lockedRental.Id), "active customer uses their own return workflow");
         admin.SetCustomerActive(customer.CurrentUser!.Id, false);
         Expect(() => customer.CancelHold(otherHold.Id), "locking a customer invalidates an already open session");
         Check(DataStore.Open(connection).Users.Single(u => u.Id == 2).IsActive == false, "customer lock persists");
+        admin.StartAdminReturn(lockedRental.Id);
+        Expect(() => admin.InspectReturn(lockedRental.Id, 0, "Kho tốt", null, false), "locked customer still needs QR or explicit verification");
+        admin.InspectReturn(lockedRental.Id, 0, "Kho tốt", null, false, identityVerified: true);
+        admin.ConfirmRefund(lockedRental.Id, "LOCKED-01");
+        Check(admin.Units.Single(u => u.Id == 10).IsAvailable &&
+            admin.Rentals.Single(r => r.Id == lockedRental.Id).InspectionNotes.Contains("đối chiếu danh tính"),
+            "admin returns a locked customer's unit with an audited identity check");
 
         bool Race(DataStore data)
         {
@@ -198,6 +226,12 @@ internal static class WorkflowChecks
             paymentBarrier.SignalAndWait();
             return data.PayHeldRental(validHold.Id, "Chuyển khoản", code);
         }
+    }
+
+    internal static Rental BookPaid(DataStore customer, int unitId, DateTime start, int months, decimal price, string method)
+    {
+        var hold = customer.CreateHold(unitId, start, months, price);
+        return customer.PayHeldRental(hold.Id, method, Guid.NewGuid().ToString("N"));
     }
 
     static T Clone<T>(T item) => JsonSerializer.Deserialize<T>(JsonSerializer.Serialize(item))!;

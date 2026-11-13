@@ -80,14 +80,14 @@ public partial class MyRentalsView : UserControl
         var r = grid.SelectedItem as Rental;
         btnPayHold.IsEnabled = btnCancelHold.IsEnabled = r?.IsAwaitingPayment == true;
         btnQr.IsEnabled = r is { IsOpen: true, PaidAt: not null } && r.QrContent != "";
-        btnReturn.IsEnabled = r is { IsOpen: true, PaidAt: not null, ReturnRequestedAt: null } &&
-            (r.ReceivedAt != null || r.IsLegacyRental);
+        btnReturn.IsEnabled = r is { CanStartReturn: true, WasHandedOver: true };
         lblDetails.Text = r == null ? "Chọn đơn để xem chi tiết."
             : r.IsAwaitingPayment ? $"Giữ kho đến {r.HoldDeadlineLocal:HH:mm:ss dd/MM/yyyy} • Tổng cần thanh toán: {r.Total:N2} ₫"
             : r.PaidAt == null ? r.StatusText
             : $"Nhận kho: {r.ReceivedAt:dd/MM/yyyy HH:mm} • Yêu cầu trả: {r.ReturnRequestedAt:dd/MM/yyyy HH:mm}\n" +
               $"Cọc: {r.Deposit:N2} ₫ • Phí phát sinh: {r.ExtraFee:N2} ₫ • Khấu trừ: {r.Deduction:N2} ₫ • {r.RefundText}\n" +
               $"Biên bản: {r.InspectionNotes}\nMã đối soát: {r.RefundReference} • Lúc: {r.RefundedAt:dd/MM/yyyy HH:mm}"
+            + (r is { MissedPickup: true, CanStartReturn: true } ? "\nLiên hệ Admin để đối soát cọc cho đơn quá hạn nhận kho." : "")
             + (r.ExtraFee > r.Deduction ? $"\nPhí vượt cọc: {r.ExtraFee - r.Deduction:N2} ₫" : "");
     }
 }

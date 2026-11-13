@@ -81,8 +81,8 @@ public partial class AdminWindow : Window
     {
         var month = dpRevenueMonth.SelectedDate ?? DateTime.Today;
         int free = _db.Units.Count(u => u.IsAvailable);
-        int rented = _db.Rentals.Count(r => r.IsOpen && r.PaidAt != null && (r.ReceivedAt != null || r.IsLegacyRental));
-        decimal revenue = _db.Rentals.Where(r => r.PaidAt is DateTime paid && paid.Year == month.Year && paid.Month == month.Month)
+        int rented = _db.Rentals.Count(r => r.IsOpen && r.PaidAt != null && r.WasHandedOver);
+        decimal revenue = _db.Rentals.Where(r => r.PaidAtLocal is DateTime paid && paid.Year == month.Year && paid.Month == month.Month)
             .Sum(r => r.RentFee);
         lblStats.Text = $"Còn trống: {free}  |  Đang thuê: {rented}  |  Phí thuê thu trong tháng {month:MM/yyyy}: {revenue:N2} ₫";
     }
@@ -106,7 +106,7 @@ public partial class AdminWindow : Window
     void AddUnit_Click(object sender, RoutedEventArgs e)
     {
         if (!UiActions.Try(_db.Reload)) return;
-        if (_db.Facilities.Count == 0) { MessageBox.Show("Hãy tạo cơ sở trước khi thêm kho."); return; }
+        if (_db.Facilities.Count == 0) { MessageBox.Show("Danh mục chưa có vị trí kho. Hãy liên hệ người quản trị dữ liệu."); return; }
         var w = new UnitEditWindow(null) { Owner = this };
         if (w.ShowDialog() != true) return;
         UiActions.Try(() => _db.SaveUnit(w.Unit, null));
@@ -146,6 +146,8 @@ public partial class AdminWindow : Window
     void Receive_Click(object sender, RoutedEventArgs e) => OpenOperation(RentalOperation.Receive);
     void Inspect_Click(object sender, RoutedEventArgs e) => OpenOperation(RentalOperation.Inspect);
     void Refund_Click(object sender, RoutedEventArgs e) => OpenOperation(RentalOperation.Refund);
+
+    void StartReturn_Click(object sender, RoutedEventArgs e) => OpenOperation(RentalOperation.StartReturn);
 
     void OpenOperation(RentalOperation operation)
     {

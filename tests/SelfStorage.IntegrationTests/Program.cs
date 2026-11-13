@@ -2,6 +2,8 @@ using Microsoft.Data.SqlClient;
 using SelfStorage;
 using System.Text.Json;
 using System.IO;
+using System.Security.Cryptography;
+using System.Text;
 
 // Real SQL Server integration checks. Every database is uniquely named and removed.
 var masterString = Environment.GetEnvironmentVariable("SELFSTORAGE_TEST_CONNECTION_STRING")
@@ -15,10 +17,16 @@ try
     var connection = NewDatabase();
     var db = DataStore.Open(connection);
     Check(db.Users.Count == 2 && db.Facilities.Count == 3 && db.Units.Count == 36 && db.Rentals.Count == 0, "initial seed");
-    Check(db.Users.Single(u => u.Role == "Admin").PasswordHash == DataStore.Hash("admin123"), "demo login hash");
+    Check(db.Login("admin@demo.com", "admin123") && db.CurrentUser?.Role == "Admin", "demo login uses salted hash");
+    Check(db.Users.All(u => u.PasswordHash == ""), "account lists do not load password hashes");
+    var customerSession = DataStore.Open(connection);
+    Check(customerSession.Login("demo@demo.com", "123456") &&
+        customerSession.Users.Single(u => u.Id == 2).Email == "demo@demo.com" &&
+        customerSession.Users.Where(u => u.Id != 2).All(u => u.Email == "" && u.PasswordHash == ""),
+        "customer session only loads its own email and no password hashes");
     Check(DataStore.Open(connection).Units.Count == 36, "schema and seed are idempotent");
 
-    db.Users.Add(new User { Id = db.NextUserId(), FullName = "Nguyễn 'Test'; --", Email = "test@example.com", PasswordHash = DataStore.Hash("secret123") });
+    db.Register("Nguyễn 'Test'; --", "test@example.com", "secret123");
     db.Facilities.Add(new Facility { Id = 4, Name = "Kho thử nghiệm", Address = "Địa chỉ tiếng Việt" });
     db.Units.Add(new StorageUnit { Id = 37, FacilityId = 4, Code = "TEST-01", Type = "Có điều hòa", SizeM2 = 3.75, PricePerMonth = 123456.78m });
     db.Save();
@@ -85,12 +93,28 @@ try
     Check(!DataStore.Open(connection).Facilities.Any(f => f.Id == 4) && !DataStore.Open(connection).Units.Any(u => u.Id == 101), "admin delete and move unit");
 
     var jsonPath = Path.Combine(temporaryDirectory, "data.json");
-    var json = JsonSerializer.Serialize(DataStore.Open(connection));
+    var legacyFixture = DataStore.Open(connection);
+    string legacyHash = Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes("legacy-pass")));
+    foreach (var user in legacyFixture.Users)
+    {
+        user.Email = $"legacy{user.Id}@example.com";
+        user.PasswordHash = legacyHash;
+    }
+    var json = JsonSerializer.Serialize(legacyFixture);
     File.WriteAllText(jsonPath, json);
     var migratedConnection = NewDatabase();
     var migrated = DataStore.Open(migratedConnection, jsonPath);
     Check(migrated.Users.Count == 3 && migrated.Rentals.Count == 1 && migrated.Units.Last().FacilityId == 5, "JSON import preserves users and rental history");
     Check(File.ReadAllText(jsonPath) == json, "JSON source preserved");
+    Check(!migrated.Login("legacy2@example.com", "wrong") && migrated.Login("legacy2@example.com", "legacy-pass"),
+        "imported legacy account can sign in with its original password");
+    using (var sql = new SqlConnection(migratedConnection))
+    {
+        sql.Open();
+        using var query = new SqlCommand("SELECT PasswordHash FROM dbo.Users WHERE Id = 2", sql);
+        Check(((string)query.ExecuteScalar()!).StartsWith("pbkdf2-sha256$"), "successful legacy login upgrades its stored hash");
+    }
+    Check(DataStore.Open(migratedConnection).Login("legacy2@example.com", "legacy-pass"), "upgraded password works in a new session");
     File.WriteAllText(jsonPath, "broken JSON");
     Check(DataStore.Open(migratedConnection, jsonPath).Users.Count == 3, "JSON imported only once");
     var malformedConnection = NewDatabase();
@@ -128,8 +152,34 @@ try
     empty.Users.Clear();
     empty.Save();
     Check(DataStore.Open(provisionedConnection).Users.Count == 0, "initialized empty database is not reseeded");
+    var upgradeConnection = NewDatabase();
+    using (var sql = new SqlConnection(upgradeConnection))
+    {
+        sql.Open();
+        string schema = File.ReadAllText(Path.Combine(AppContext.BaseDirectory, "Schema.sql"));
+        int migration = schema.IndexOf("IF EXISTS (SELECT 1 FROM dbo.StoreState WHERE Id = 1 AND SchemaVersion = 3)", StringComparison.Ordinal);
+        using var createV3 = new SqlCommand(schema[..migration] + "COMMIT;", sql);
+        createV3.ExecuteNonQuery();
+        using var seedV3 = new SqlCommand("""
+            INSERT dbo.Users (Id, FullName, Email, PasswordHash, Role)
+                VALUES (1, N'Khách', 'v3@example.com', @hash, 'Customer');
+            INSERT dbo.Facilities VALUES (1, N'Vị trí', N'Địa chỉ');
+            INSERT dbo.StorageUnits VALUES (1, 1, N'A01', N'Nhỏ', 2, 100, 0);
+            INSERT dbo.Rentals (Id, UserId, UnitId, StartDate, Months, Deposit, RentFee, PaymentMethod, PaidAt, QrContent, IsReturned)
+                VALUES (1, 1, 1, '2026-01-01', 1, 100, 100, N'Chuyển khoản', '2026-01-31T23:45:00', N'OLD', 0);
+            INSERT dbo.Payments VALUES (1, 200, 'old-payment', N'Chuyển khoản', '2026-01-31T23:45:00');
+            """, sql);
+        seedV3.Parameters.AddWithValue("@hash", legacyHash);
+        seedV3.ExecuteNonQuery();
+    }
+    var upgraded = DataStore.Open(upgradeConnection);
+    var historicalPayment = upgraded.Rentals.Single();
+    Check(!historicalPayment.PaidAtIsUtc && historicalPayment.PaidAtLocal == new DateTime(2026, 1, 31, 23, 45, 0) &&
+        historicalPayment.TransactionCode == "old-payment" && historicalPayment.QrContent == "OLD",
+        "v3 migration preserves historical local payment month, reference and QR");
+    Check(upgraded.Login("v3@example.com", "legacy-pass"), "v3 account can sign in with its original password");
     await WorkflowChecks.Run(NewDatabase);
-    WpfChecks.Run(NewDatabase());
+    WpfChecks.Run(NewDatabase(), Path.Combine(temporaryDirectory, "wpf-legacy-does-not-exist.json"));
     Console.WriteLine("All SQL Server and WPF workflow checks passed.");
 
     bool ConcurrentSave(DataStore data)

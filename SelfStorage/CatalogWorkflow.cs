@@ -10,7 +10,7 @@ public partial class DataStore
         if (name.Length is 0 or > 200 || email.Length > 320 || !MailAddress.TryCreate(email, out var address) || address.Address != email || password.Length < 6)
             throw new InvalidOperationException("Nhập họ tên (tối đa 200 ký tự), email hợp lệ và mật khẩu ít nhất 6 ký tự.");
         if (db.Users.Any(u => u.Email.Equals(email, StringComparison.OrdinalIgnoreCase))) throw new InvalidOperationException("Email đã tồn tại.");
-        db.Users.Add(new User { Id = db.NextUserId(), FullName = name, Email = email, PasswordHash = Hash(password) });
+        db.Users.Add(new User { Id = db.NextUserId(), FullName = name, Email = email, PasswordHash = HashPassword(password) });
     });
 
     public void SaveUnit(StorageUnit draft, StorageUnit? original) => Change(db =>
@@ -44,21 +44,6 @@ public partial class DataStore
         user.IsActive = active;
     });
 
-    public void SaveFacility(Facility draft, Facility? original) => Change(db =>
-    {
-        db.RequireAdmin();
-        if (string.IsNullOrWhiteSpace(draft.Name) || draft.Name.Length > 200 || draft.Address.Length > 500)
-            throw new InvalidOperationException("Tên cơ sở tối đa 200 ký tự, địa chỉ tối đa 500 ký tự.");
-        var current = original == null ? null : db.Facilities.SingleOrDefault(f => f.Id == original.Id);
-        if (original != null && (current == null || (current.Name, current.Address) != (original.Name, original.Address)))
-            throw new StoreConcurrencyException("Cơ sở đã được chỉnh sửa ở phiên khác. Hãy mở lại cửa sổ sửa.");
-        if (db.Facilities.Any(f => f.Id != current?.Id && f.Name.Equals(draft.Name.Trim(), StringComparison.OrdinalIgnoreCase)))
-            throw new InvalidOperationException("Tên cơ sở đã tồn tại.");
-        var target = current ?? new Facility { Id = db.Facilities.Count == 0 ? 1 : db.Facilities.Max(f => f.Id) + 1 };
-        target.Name = draft.Name.Trim(); target.Address = draft.Address.Trim();
-        if (current == null) db.Facilities.Add(target);
-    });
-
     public void DeleteUnit(int id) => Change(db =>
     {
         db.RequireAdmin();
@@ -66,10 +51,4 @@ public partial class DataStore
         db.Units.RemoveAll(u => u.Id == id);
     });
 
-    public void DeleteFacility(int id) => Change(db =>
-    {
-        db.RequireAdmin();
-        if (db.Units.Any(u => u.FacilityId == id)) throw new InvalidOperationException("Cơ sở vẫn còn kho bên trong.");
-        db.Facilities.RemoveAll(f => f.Id == id);
-    });
 }

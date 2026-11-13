@@ -67,7 +67,7 @@ BEGIN
     CREATE INDEX IX_Rentals_UserId ON dbo.Rentals(UserId);
 END;
 
-IF EXISTS (SELECT 1 FROM dbo.StoreState WHERE SchemaVersion NOT IN (1, 2, 3))
+IF EXISTS (SELECT 1 FROM dbo.StoreState WHERE SchemaVersion NOT IN (1, 2, 3, 4))
     THROW 50003, 'Unsupported SelfStorage schema version.', 1;
 
 IF EXISTS (SELECT 1 FROM dbo.StoreState WHERE Id = 1 AND SchemaVersion = 1)
@@ -126,5 +126,11 @@ BEGIN
         PaidAt datetime2 NOT NULL
     );
     UPDATE dbo.StoreState SET SchemaVersion = 3, Revision = CASE WHEN Revision = 0 THEN 0 ELSE Revision + 1 END WHERE Id = 1;
+END;
+IF EXISTS (SELECT 1 FROM dbo.StoreState WHERE Id = 1 AND SchemaVersion = 3)
+BEGIN
+    ALTER TABLE dbo.Users ALTER COLUMN PasswordHash varchar(160) NOT NULL;
+    ALTER TABLE dbo.Rentals ADD PaidAtIsUtc bit NOT NULL CONSTRAINT DF_Rentals_PaidAtIsUtc DEFAULT 0;
+    UPDATE dbo.StoreState SET SchemaVersion = 4, Revision = CASE WHEN Revision = 0 THEN 0 ELSE Revision + 1 END WHERE Id = 1;
 END;
 COMMIT;

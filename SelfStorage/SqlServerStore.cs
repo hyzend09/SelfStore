@@ -25,7 +25,41 @@ internal sealed class SqlServerStore(string connectionString)
         command.ExecuteNonQuery();
     }
 
-    internal DataStore Load()
+    internal User? Authenticate(string email, string password)
+    {
+        using var connection = Connect();
+        using var lookup = new SqlCommand("""
+            SELECT Id, FullName, Email, Role, IsActive, PasswordHash FROM dbo.Users WHERE Email = @email
+            """, connection);
+        lookup.Parameters.Add("@email", SqlDbType.NVarChar, 320).Value = email;
+        if (email.Length > 320) return null;
+
+        User user;
+        string stored;
+        using (var reader = lookup.ExecuteReader())
+        {
+            if (!reader.Read()) return null;
+            user = new User { Id = reader.GetInt32(0), FullName = reader.GetString(1), Email = reader.GetString(2),
+                Role = reader.GetString(3), IsActive = reader.GetBoolean(4) };
+            stored = reader.GetString(5);
+        }
+        if (!DataStore.VerifyPassword(password, stored, out bool legacy)) return null;
+        if (!user.IsActive) throw new InvalidOperationException("Tài khoản đã bị khóa. Hãy liên hệ quản trị viên.");
+        if (legacy)
+        {
+            using var upgrade = new SqlCommand("""
+                UPDATE dbo.Users SET PasswordHash = @newHash
+                WHERE Id = @id AND PasswordHash = @oldHash AND IsActive = 1
+                """, connection);
+            upgrade.Parameters.Add("@newHash", SqlDbType.VarChar, 160).Value = DataStore.HashPassword(password);
+            upgrade.Parameters.Add("@id", SqlDbType.Int).Value = user.Id;
+            upgrade.Parameters.Add("@oldHash", SqlDbType.VarChar, 160).Value = stored;
+            upgrade.ExecuteNonQuery();
+        }
+        return user;
+    }
+
+    internal DataStore Load(int? userId = null)
     {
         using var connection = Connect();
         using var transaction = connection.BeginTransaction(IsolationLevel.Serializable);
@@ -47,14 +81,21 @@ internal sealed class SqlServerStore(string connectionString)
         Read("SELECT SchemaVersion, Revision, SYSUTCDATETIME() FROM dbo.StoreState WHERE Id = 1", r =>
         {
             hasState = true;
-            if (r.GetInt32(0) != 3) throw new InvalidDataException("Phiên bản database chưa được hỗ trợ.");
+            if (r.GetInt32(0) != 4) throw new InvalidDataException("Phiên bản database chưa được hỗ trợ.");
             db.Revision = r.GetInt64(1);
             db.DatabaseUtcNow = DateTime.SpecifyKind(r.GetDateTime(2), DateTimeKind.Utc);
         });
         if (!hasState) throw new InvalidDataException("Thiếu thông tin phiên bản database (StoreState).");
-        Read("SELECT Id, FullName, Email, PasswordHash, Role, IsActive FROM dbo.Users ORDER BY Id", r =>
+        Read("""
+            SELECT Id, FullName,
+                CASE WHEN Id = @userId OR EXISTS (SELECT 1 FROM dbo.Users
+                    WHERE Id = @userId AND Role = 'Admin' AND IsActive = 1) THEN Email ELSE N'' END,
+                Role, IsActive
+            FROM dbo.Users ORDER BY Id
+            """, r =>
             db.Users.Add(new User { Id = r.GetInt32(0), FullName = r.GetString(1), Email = r.GetString(2),
-                PasswordHash = r.GetString(3), Role = r.GetString(4), IsActive = r.GetBoolean(5) }));
+                Role = r.GetString(3), IsActive = r.GetBoolean(4) }),
+            new SqlParameter("@userId", SqlDbType.Int) { Value = (object?)userId ?? DBNull.Value });
         Read("SELECT Id, Name, Address FROM dbo.Facilities ORDER BY Id", r =>
             db.Facilities.Add(new Facility { Id = r.GetInt32(0), Name = r.GetString(1), Address = r.GetString(2) }));
         Read("SELECT Id, FacilityId, Code, Type, SizeM2, PricePerMonth, IsAvailable FROM dbo.StorageUnits ORDER BY Id", r =>
@@ -66,7 +107,7 @@ internal sealed class SqlServerStore(string connectionString)
                 r.FacilityNameSnapshot, r.FacilityAddressSnapshot, r.ReceivedAt, r.ReceivedByUserId, r.ReturnRequestedAt,
                 r.InspectedAt, r.InspectedByUserId, r.InspectionNotes, r.Deduction, r.RefundAmount, r.RefundedAt,
                 r.RefundedByUserId, r.RefundReference, r.IsLegacyRental, r.HoldExpiresAt, r.HoldOutcome,
-                r.ExtraFee, r.RequiresMaintenance, p.TransactionCode
+                r.ExtraFee, r.RequiresMaintenance, p.TransactionCode, r.PaidAtIsUtc
             FROM dbo.Rentals r LEFT JOIN dbo.Payments p ON p.Id = r.Id ORDER BY r.Id
             """, r =>
             db.Rentals.Add(new Rental { Id = r.GetInt32(0), UserId = r.GetInt32(1), UnitId = r.GetInt32(2),
@@ -80,13 +121,14 @@ internal sealed class SqlServerStore(string connectionString)
                 RefundedAt = Date(r, 24), RefundedByUserId = Id(r, 25), RefundReference = r.GetString(26), IsLegacyRental = r.GetBoolean(27),
                 HoldExpiresAt = Date(r, 28), HoldOutcome = r.IsDBNull(29) ? null : r.GetString(29),
                 ExtraFee = r.GetDecimal(30), RequiresMaintenance = r.GetBoolean(31),
-                TransactionCode = r.IsDBNull(32) ? null : r.GetString(32) }));
+                TransactionCode = r.IsDBNull(32) ? null : r.GetString(32), PaidAtIsUtc = r.GetBoolean(33) }));
         transaction.Commit();
         return db;
 
-        void Read(string sql, Action<SqlDataReader> consume)
+        void Read(string sql, Action<SqlDataReader> consume, SqlParameter? parameter = null)
         {
             using var command = new SqlCommand(sql, connection, transaction);
+            if (parameter != null) command.Parameters.Add(parameter);
             using var reader = command.ExecuteReader();
             while (reader.Read()) consume(reader);
         }
@@ -114,8 +156,13 @@ internal sealed class SqlServerStore(string connectionString)
 
         DeleteMissing("Rentals", db.Rentals.Select(r => r.Id));
         foreach (var u in db.Users)
-            Upsert("Users", ["Id", "FullName", "Email", "PasswordHash", "Role", "IsActive"],
-                u.Id, u.FullName, u.Email, u.PasswordHash, u.Role, u.IsActive);
+            Execute("""
+                UPDATE dbo.Users SET FullName = @p1, Email = COALESCE(NULLIF(@p2, N''), Email),
+                    Role = @p4, IsActive = @p5 WHERE Id = @p0;
+                IF @@ROWCOUNT = 0
+                    INSERT dbo.Users (Id, FullName, Email, PasswordHash, Role, IsActive)
+                    VALUES (@p0, @p1, NULLIF(@p2, N''), NULLIF(@p3, ''), @p4, @p5);
+                """, [u.Id, u.FullName, u.Email, u.PasswordHash, u.Role, u.IsActive]);
         foreach (var f in db.Facilities)
             Upsert("Facilities", ["Id", "Name", "Address"], f.Id, f.Name, f.Address);
         foreach (var u in db.Units)
@@ -123,12 +170,12 @@ internal sealed class SqlServerStore(string connectionString)
                 u.Id, u.FacilityId, u.Code, u.Type, u.SizeM2, u.PricePerMonth, u.IsAvailable);
         foreach (var r in db.Rentals.OrderBy(r => r.IsOpen).ThenBy(r => r.Id))
         {
-            Upsert("Rentals", ["Id", "UserId", "UnitId", "StartDate", "Months", "Deposit", "RentFee", "PaymentMethod", "PaidAt", "QrContent", "IsReturned", "ReturnedAt", "CustomerNameSnapshot", "UnitCodeSnapshot", "FacilityNameSnapshot", "FacilityAddressSnapshot", "ReceivedAt", "ReceivedByUserId", "ReturnRequestedAt", "InspectedAt", "InspectedByUserId", "InspectionNotes", "Deduction", "RefundAmount", "RefundedAt", "RefundedByUserId", "RefundReference", "IsLegacyRental", "HoldExpiresAt", "HoldOutcome", "ExtraFee", "RequiresMaintenance"],
+            Upsert("Rentals", ["Id", "UserId", "UnitId", "StartDate", "Months", "Deposit", "RentFee", "PaymentMethod", "PaidAt", "QrContent", "IsReturned", "ReturnedAt", "CustomerNameSnapshot", "UnitCodeSnapshot", "FacilityNameSnapshot", "FacilityAddressSnapshot", "ReceivedAt", "ReceivedByUserId", "ReturnRequestedAt", "InspectedAt", "InspectedByUserId", "InspectionNotes", "Deduction", "RefundAmount", "RefundedAt", "RefundedByUserId", "RefundReference", "IsLegacyRental", "HoldExpiresAt", "HoldOutcome", "ExtraFee", "RequiresMaintenance", "PaidAtIsUtc"],
                 r.Id, r.UserId, r.UnitId, r.StartDate, r.Months, r.Deposit, r.RentFee, r.PaymentMethod, r.PaidAt,
                 r.QrContent, r.IsReturned, r.ReturnedAt, r.CustomerNameSnapshot, r.UnitCodeSnapshot, r.FacilityNameSnapshot,
                 r.FacilityAddressSnapshot, r.ReceivedAt, r.ReceivedByUserId, r.ReturnRequestedAt, r.InspectedAt,
                 r.InspectedByUserId, r.InspectionNotes, r.Deduction, r.RefundAmount, r.RefundedAt, r.RefundedByUserId,
-                r.RefundReference, r.IsLegacyRental, r.HoldExpiresAt, r.HoldOutcome, r.ExtraFee, r.RequiresMaintenance);
+                r.RefundReference, r.IsLegacyRental, r.HoldExpiresAt, r.HoldOutcome, r.ExtraFee, r.RequiresMaintenance, r.PaidAtIsUtc);
             if (r.PaidAt != null && r.TransactionCode != null)
                 Execute("""
                     IF NOT EXISTS (SELECT 1 FROM dbo.Payments WHERE Id = @p0)

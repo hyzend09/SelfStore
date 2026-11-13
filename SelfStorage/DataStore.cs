@@ -12,7 +12,8 @@ public partial class DataStore
     static readonly string LegacyFilePath = Path.Combine(
         Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "SelfStorage", "data.json");
 
-    static readonly Lazy<DataStore> Default = new(() => Open(ReadConnectionString(), LegacyFilePath));
+    static readonly Lazy<DataStore> Default = new(() => Open(ReadConnectionString(),
+        Environment.GetEnvironmentVariable("SELFSTORAGE_LEGACY_JSON_PATH") ?? LegacyFilePath));
     public static DataStore Instance => Default.Value;
     SqlServerStore? _store;
     internal long Revision { get; set; }
@@ -26,8 +27,42 @@ public partial class DataStore
 
     [JsonIgnore] public User? CurrentUser { get; set; }
 
-    public static string Hash(string s) =>
-        Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(s)));
+    const int PasswordIterations = 600_000;
+
+    internal static string HashPassword(string password)
+    {
+        byte[] salt = RandomNumberGenerator.GetBytes(16);
+        byte[] hash = Rfc2898DeriveBytes.Pbkdf2(password, salt, PasswordIterations, HashAlgorithmName.SHA256, 32);
+        return $"pbkdf2-sha256${PasswordIterations}${Convert.ToHexString(salt)}${Convert.ToHexString(hash)}";
+    }
+
+    internal static bool VerifyPassword(string password, string stored, out bool legacy)
+    {
+        legacy = stored.Length == 64;
+        try
+        {
+            if (legacy)
+                return CryptographicOperations.FixedTimeEquals(Convert.FromHexString(stored),
+                    SHA256.HashData(Encoding.UTF8.GetBytes(password)));
+
+            string[] fields = stored.Split('$');
+            if (fields.Length != 4 || fields[0] != "pbkdf2-sha256" || !int.TryParse(fields[1], out int iterations) ||
+                iterations is < 600_000 or > 2_000_000 || fields[2].Length != 32 || fields[3].Length != 64) return false;
+            var actual = Rfc2898DeriveBytes.Pbkdf2(password, Convert.FromHexString(fields[2]), iterations, HashAlgorithmName.SHA256, 32);
+            return CryptographicOperations.FixedTimeEquals(actual, Convert.FromHexString(fields[3]));
+        }
+        catch (FormatException) { return false; }
+    }
+
+    public bool Login(string email, string password)
+    {
+        if (_store == null) throw new InvalidOperationException("DataStore chưa kết nối SQL Server.");
+        var user = _store.Authenticate(email.Trim(), password);
+        if (user == null) return false;
+        CurrentUser = user;
+        Reload();
+        return CurrentUser != null;
+    }
 
     public int NextRentalId() => Rentals.Count == 0 ? 1 : Rentals.Max(r => r.Id) + 1;
     public int NextUserId() => Users.Count == 0 ? 1 : Users.Max(u => u.Id) + 1;
@@ -37,14 +72,15 @@ public partial class DataStore
         if (_store == null) throw new InvalidOperationException("DataStore chưa kết nối SQL Server.");
         CaptureMissingSnapshots();
         _store.Save(this);
+        foreach (var user in Users) user.PasswordHash = "";
         UpdateUnitStatuses();
     }
 
     public void Reload()
     {
         if (_store == null) throw new InvalidOperationException("DataStore chưa kết nối SQL Server.");
-        var loaded = _store.Load();
         var userId = CurrentUser?.Id;
+        var loaded = _store.Load(userId);
         Users = loaded.Users;
         Facilities = loaded.Facilities;
         Units = loaded.Units;
@@ -136,8 +172,8 @@ public partial class DataStore
     static DataStore Seed()
     {
         var db = new DataStore();
-        db.Users.Add(new User { Id = 1, FullName = "Admin", Email = "admin@demo.com", PasswordHash = Hash("admin123"), Role = "Admin" });
-        db.Users.Add(new User { Id = 2, FullName = "Khách demo", Email = "demo@demo.com", PasswordHash = Hash("123456") });
+        db.Users.Add(new User { Id = 1, FullName = "Admin", Email = "admin@demo.com", PasswordHash = HashPassword("admin123"), Role = "Admin" });
+        db.Users.Add(new User { Id = 2, FullName = "Khách demo", Email = "demo@demo.com", PasswordHash = HashPassword("123456") });
 
         db.Facilities.Add(new Facility { Id = 1, Name = "Kho Quận 1", Address = "12 Nguyễn Huệ, Q.1, TP.HCM" });
         db.Facilities.Add(new Facility { Id = 2, Name = "Kho Thủ Đức", Address = "88 Võ Văn Ngân, TP. Thủ Đức" });

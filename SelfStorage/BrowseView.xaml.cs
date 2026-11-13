@@ -83,7 +83,7 @@ public partial class BrowseView : UserControl
         unit = _db.Units.FirstOrDefault(u => u.Id == unit.Id)!;
         if (unit == null) { LoadUnits(); return; }
         if (!unit.IsAvailable)
-        { MessageBox.Show("Kho này đã được thuê."); return; }
+        { ShowUnits(); MessageBox.Show($"Kho {unit.Code} chưa thể đặt. Trạng thái hiện tại: {unit.StatusText}."); return; }
 
         var win = new BookingWindow(unit) { Owner = Window.GetWindow(this) };
         if (win.ShowDialog() == true) Booked?.Invoke();

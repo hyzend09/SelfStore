@@ -71,6 +71,7 @@
                         <Button Content="Làm mới" Click="Refresh_Click"/>
                         <Button Content="Bàn giao nhận kho (QR)" Click="Receive_Click"/>
                         <Button Content="Kiểm tra trả kho" Click="Inspect_Click"/>
+                        <Button Content="Xử lý đơn ngoại lệ" Click="StartReturn_Click"/>
                         <Button Content="Xác nhận hoàn cọc" Click="Refund_Click"/>
                     </StackPanel>
                     <DataGrid x:Name="gridRentals" AutoGenerateColumns="False" IsReadOnly="True"

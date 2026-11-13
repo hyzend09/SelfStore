@@ -46,18 +46,6 @@ public partial class DataStore
         return result;
     }
 
-    // Retain the atomic booking entry point for callers that already have a simulated payment method.
-    public Rental Book(int unitId, DateTime start, int months, decimal quotedPrice, string method)
-    {
-        Rental result = null!;
-        Change(db =>
-        {
-            result = db.CreateReservation(unitId, start, months, quotedPrice);
-            RecordPayment(result, method, Guid.NewGuid().ToString("N"));
-        });
-        return result;
-    }
-
     Rental FindCustomerRental(int rentalId)
     {
         var customer = RequireCustomer();
@@ -83,7 +71,7 @@ public partial class DataStore
                 if (db.Rentals.Any(r => r.TransactionCode == transactionCode))
                     throw new InvalidOperationException("Mã giao dịch đã được sử dụng.");
                 db.PayingRentalId = rentalId;
-                RecordPayment(result, method, transactionCode);
+                RecordPayment(result, method, transactionCode, db.DatabaseUtcNow);
             });
         }
         catch (StoreConcurrencyException)
@@ -97,12 +85,13 @@ public partial class DataStore
         bool MatchesPayment(Rental rental) => rental.TransactionCode == transactionCode && rental.PaymentMethod == method;
     }
 
-    static void RecordPayment(Rental rental, string method, string transactionCode)
+    static void RecordPayment(Rental rental, string method, string transactionCode, DateTime paidAtUtc)
     {
         if (method is not ("Thẻ ngân hàng" or "Ví điện tử" or "Chuyển khoản"))
             throw new InvalidOperationException("Phương thức thanh toán không hợp lệ.");
         rental.PaymentMethod = method;
-        rental.PaidAt = DateTime.Now;
+        rental.PaidAt = paidAtUtc;
+        rental.PaidAtIsUtc = true;
         rental.TransactionCode = transactionCode;
         rental.QrContent = $"SELFSTORAGE|{rental.Id}|{Guid.NewGuid():N}";
     }
@@ -145,33 +134,57 @@ public partial class DataStore
     public void RequestReturn(int rentalId) => Change(db =>
     {
         var rental = db.FindCustomerRental(rentalId);
-        if (!rental.IsOpen || rental.PaidAt == null || rental.ReturnRequestedAt != null)
+        if (!rental.CanStartReturn || !rental.WasHandedOver)
             throw new InvalidOperationException("Đơn chưa đủ điều kiện yêu cầu trả kho.");
-        if (rental.ReceivedAt == null && !rental.IsLegacyRental) throw new InvalidOperationException("Bạn chưa nhận kho nên chưa thể yêu cầu trả kho.");
         rental.ReturnRequestedAt = DateTime.Now;
         // The unit stays reserved until inspection and deposit settlement finish.
     });
 
-    public void InspectReturn(int rentalId, decimal deduction, string notes) =>
-        InspectReturn(rentalId, deduction, notes, null, false);
+    public void StartAdminReturn(int rentalId) => Change(db =>
+    {
+        db.RequireAdmin();
+        var rental = db.FindRental(rentalId);
+        if (!rental.CanStartReturn)
+            throw new InvalidOperationException("Chỉ có thể xử lý đơn đã bàn giao hoặc đã quá hạn nhận kho.");
+        if (rental.WasHandedOver && !db.IsCustomerLocked(rental))
+            throw new InvalidOperationException("Khách còn hoạt động có thể gửi yêu cầu trả kho từ tài khoản của mình.");
 
-    public void InspectReturn(int rentalId, decimal extraFee, string notes, string? qr, bool requiresMaintenance) => Change(db =>
+        var now = DateTime.Now;
+        rental.ReturnRequestedAt = now;
+        if (!rental.MissedPickup) return;
+
+        rental.InspectedAt = now;
+        rental.InspectedByUserId = db.CurrentUser!.Id;
+        rental.InspectionNotes = "Quá hạn nhận kho. Kho chưa được bàn giao. Hoàn toàn bộ tiền cọc.";
+        rental.RefundAmount = rental.Deposit;
+    });
+
+    internal bool IsCustomerLocked(Rental rental) =>
+        Users.Any(u => u.Id == rental.UserId && u.Role == "Customer" && !u.IsActive);
+
+    public void InspectReturn(int rentalId, decimal extraFee, string notes, string? qr, bool requiresMaintenance,
+        bool identityVerified = false) => Change(db =>
     {
         db.RequireAdmin();
         var rental = db.FindRental(rentalId);
         if (!rental.IsOpen || rental.PaidAt == null || rental.ReturnRequestedAt == null || rental.InspectedAt != null)
             throw new InvalidOperationException("Đơn chưa yêu cầu trả hoặc đã được kiểm tra.");
-        if (rental.RequiresReturnQr && (string.IsNullOrWhiteSpace(qr) || rental.QrContent != qr.Trim()))
+        if (identityVerified && (!string.IsNullOrWhiteSpace(qr) || !db.IsCustomerLocked(rental)))
+            throw new InvalidOperationException("Xác minh thủ công chỉ áp dụng khi tài khoản khách đang bị khóa và khách không xuất trình được QR.");
+        if (rental.RequiresReturnQr && !identityVerified && (string.IsNullOrWhiteSpace(qr) || rental.QrContent != qr.Trim()))
             throw new InvalidOperationException("QR không khớp đơn đang trả kho.");
         if (!ValidMoney(extraFee, allowZero: true))
             throw new InvalidOperationException("Phí phát sinh phải từ 0 và có tối đa 2 chữ số thập phân.");
-        if (string.IsNullOrWhiteSpace(notes) || notes.Trim().Length > 1000)
+        var report = notes.Trim();
+        if (report.Length == 0)
             throw new InvalidOperationException("Nhập biên bản kiểm tra (tối đa 1000 ký tự), nêu rõ lý do nếu khấu trừ.");
+        if (identityVerified) report = "Admin đã đối chiếu danh tính khách và mã đơn.\n" + report;
+        if (report.Length > 1000) throw new InvalidOperationException("Biên bản kiểm tra tối đa 1000 ký tự.");
         rental.ExtraFee = extraFee;
         rental.RequiresMaintenance = requiresMaintenance;
         rental.Deduction = Math.Min(extraFee, rental.Deposit);
         rental.RefundAmount = rental.Deposit - rental.Deduction;
-        rental.InspectionNotes = notes.Trim();
+        rental.InspectionNotes = report;
         rental.InspectedAt = DateTime.Now;
         rental.InspectedByUserId = db.CurrentUser!.Id;
     });

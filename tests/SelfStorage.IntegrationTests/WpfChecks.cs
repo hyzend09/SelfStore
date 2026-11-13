@@ -6,9 +6,10 @@ using System.Windows.Threading;
 
 internal static class WpfChecks
 {
-    public static void Run(string connection)
+    public static void Run(string connection, string isolatedLegacyPath)
     {
         Environment.SetEnvironmentVariable("SELFSTORAGE_CONNECTION_STRING", connection);
+        Environment.SetEnvironmentVariable("SELFSTORAGE_LEGACY_JSON_PATH", isolatedLegacyPath);
         Exception? failure = null;
         var thread = new Thread(() =>
         {
@@ -20,6 +21,8 @@ internal static class WpfChecks
                 try
                 {
                     var db = DataStore.Instance;
+                    Check(db.Rentals.Count == 0 && db.Units.Count == 36 && db.Units[0].IsAvailable,
+                        "WPF fixture uses isolated JSON path and starts with seeded units");
                     db.CurrentUser = db.Users.Single(u => u.Id == 1);
                     var original = db.Units[0];
                     var draft = new StorageUnit { Id = original.Id, FacilityId = original.FacilityId, Code = original.Code,
@@ -55,7 +58,8 @@ internal static class WpfChecks
                     var adminWindow = new AdminWindow();
                     var external = DataStore.Open(connection);
                     external.CurrentUser = external.Users.Single(u => u.Id == 1);
-                    external.SaveFacility(new Facility { Name = "Cơ sở từ máy khác", Address = "Test" }, null);
+                    external.Facilities.Add(new Facility { Id = 4, Name = "Cơ sở từ máy khác", Address = "Test" });
+                    external.Save();
                     Click(adminWindow, "Refresh_Click");
                     var locationFilter = Field<ComboBox>(adminWindow, "cbFilter");
                     Check(locationFilter.Items.Cast<Facility>().Any(f => f.Name == "Cơ sở từ máy khác"), "admin refresh reads external location data");
@@ -64,7 +68,7 @@ internal static class WpfChecks
                     adminWindow.Close();
 
                     db.CurrentUser = db.Users.Single(u => u.Id == 2);
-                    var rental = db.Book(1, DateTime.Today, 1, 123456.78m, "Thẻ ngân hàng");
+                    var rental = WorkflowChecks.BookPaid(db, 1, DateTime.Today, 1, 123456.78m, "Thẻ ngân hàng");
                     db.CurrentUser = db.Users.Single(u => u.Id == 1);
                     var pickup = new RentalOperationsWindow(rental.Id, RentalOperation.Receive);
                     Check(Dialog(pickup, () => { Field<TextBox>(pickup, "txtQr").Text = rental.QrContent; Click(pickup, "Confirm_Click"); }) == true,
@@ -133,6 +137,21 @@ internal static class WpfChecks
                     mine.Reload();
                     Check(Field<DataGrid>(mine, "grid").Items.Cast<Rental>().Single(r => r.Id == uiBooked.Id).ReceivedAt != null,
                         "customer refresh sees pickup from another SQL session");
+                    external.SetCustomerActive(uiBooked.UserId, false);
+                    db.CurrentUser = db.Users.Single(u => u.Id == 1);
+                    db.Reload();
+                    var exceptionalReturn = new RentalOperationsWindow(uiBooked.Id, RentalOperation.StartReturn);
+                    Check(Dialog(exceptionalReturn, () => Click(exceptionalReturn, "Confirm_Click")) == true,
+                        "WPF admin can start a return for a locked customer");
+                    var manualInspection = new RentalOperationsWindow(uiBooked.Id, RentalOperation.Inspect);
+                    Check(Dialog(manualInspection, () =>
+                    {
+                        var identity = Field<CheckBox>(manualInspection, "chkIdentityVerified");
+                        Check(identity.IsVisible, "WPF offers manual identity verification for the locked customer");
+                        identity.IsChecked = true;
+                        Field<TextBox>(manualInspection, "txtNotes").Text = "Kho đã trả nguyên trạng.";
+                        Click(manualInspection, "Confirm_Click");
+                    }) == true, "WPF saves a return with explicit manual verification");
                     Check(unhandled.Count == 0, "booking/payment/QR flow has no dispatcher errors");
                 }
                 catch (Exception ex) { failure = ex; }

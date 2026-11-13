@@ -6,16 +6,17 @@
     <StackPanel Margin="20">
         <TextBlock Text="Số tiền cần thanh toán" Foreground="Gray"/>
         <TextBlock x:Name="lblAmount" FontSize="26" FontWeight="Bold" Foreground="#2D5BFF" Margin="0,0,0,14"/>
+        <TextBlock x:Name="lblDeadline" TextWrapping="Wrap" AutomationProperties.LiveSetting="Polite"/>
 
         <TextBlock Text="Phương thức thanh toán" Margin="0,0,0,4"/>
         <RadioButton x:Name="rbCard" Content="Thẻ ngân hàng" IsChecked="True" Margin="0,2"/>
         <RadioButton x:Name="rbWallet" Content="Ví điện tử (MoMo / ZaloPay)" Margin="0,2"/>
         <RadioButton x:Name="rbTransfer" Content="Chuyển khoản" Margin="0,2"/>
 
-        <TextBlock Text="(Giả lập thanh toán - chưa kết nối cổng thật)" Foreground="Gray" FontSize="11" Margin="0,8,0,0"/>
+        <TextBlock Text="Thanh toán mô phỏng. Bạn có thể đóng cửa sổ và tiếp tục từ Kho của tôi trước khi hết hạn." TextWrapping="Wrap" Foreground="Gray" Margin="0,8,0,0"/>
 
         <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,14,0,0">
-            <Button Content="Hủy" IsCancel="True"/>
+            <Button Content="Để sau" IsCancel="True"/>
             <Button x:Name="btnPay" Content="Xác nhận thanh toán" Click="Confirm_Click" IsDefault="True"/>
         </StackPanel>
     </StackPanel>

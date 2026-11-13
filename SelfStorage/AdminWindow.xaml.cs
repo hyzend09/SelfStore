@@ -1,6 +1,7 @@
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
+using System.Windows.Threading;
 
 namespace SelfStorage;
 
@@ -8,13 +9,22 @@ public partial class AdminWindow : Window
 {
     readonly DataStore _db = DataStore.Instance;
     bool _ready;
+    readonly DispatcherTimer _holdTimer = new() { Interval = TimeSpan.FromSeconds(10) };
 
     public AdminWindow()
     {
         InitializeComponent();
+        dpRevenueMonth.SelectedDate = DateTime.Today;
         lblUser.Text = $"Admin: {_db.CurrentUser?.FullName}";
         ReloadAll();
         _ready = true;
+        _holdTimer.Tick += (_, _) =>
+        {
+            if (!_db.Rentals.Any(r => r.IsAwaitingPayment && r.HoldDeadlineLocal <= DateTime.Now)) return;
+            RefreshData();
+        };
+        _holdTimer.Start();
+        Closed += (_, _) => _holdTimer.Stop();
     }
 
     // ---------- LOAD ----------
@@ -22,8 +32,8 @@ public partial class AdminWindow : Window
     {
         LoadFilter();
         LoadUnits();
-        LoadFacilities();
         LoadRentals();
+        LoadCustomers();
         LoadStats();
     }
 
@@ -51,14 +61,42 @@ public partial class AdminWindow : Window
         gridUnits.ItemsSource = q.OrderBy(u => u.FacilityId).ThenBy(u => u.Code).ToList();
     }
 
-    void LoadFacilities() => gridFacilities.ItemsSource = _db.Facilities.ToList();
-    void LoadRentals() => gridRentals.ItemsSource = _db.Rentals.OrderByDescending(r => r.Id).ToList();
+    void LoadRentals()
+    {
+        var id = (gridRentals.SelectedItem as Rental)?.Id;
+        var rentals = _db.Rentals.OrderByDescending(r => r.Id).ToList();
+        gridRentals.ItemsSource = rentals;
+        gridRentals.SelectedItem = rentals.FirstOrDefault(r => r.Id == id);
+    }
+
+    void LoadCustomers()
+    {
+        var id = (gridCustomers.SelectedItem as User)?.Id;
+        var customers = _db.Users.Where(u => u.Role == "Customer").OrderBy(u => u.FullName).ToList();
+        gridCustomers.ItemsSource = customers;
+        gridCustomers.SelectedItem = customers.FirstOrDefault(u => u.Id == id);
+    }
 
     void LoadStats()
     {
-        int total = _db.Units.Count, free = _db.Units.Count(u => u.IsAvailable);
-        decimal revenue = _db.Rentals.Sum(r => r.RentFee);
-        lblStats.Text = $"Tổng kho: {total}  |  Còn trống: {free}  |  Bận/tạm ngưng: {total - free}  |  Phí thuê: {revenue:N2} ₫";
+        var month = dpRevenueMonth.SelectedDate ?? DateTime.Today;
+        int free = _db.Units.Count(u => u.IsAvailable);
+        int rented = _db.Rentals.Count(r => r.IsOpen && r.PaidAt != null && (r.ReceivedAt != null || r.IsLegacyRental));
+        decimal revenue = _db.Rentals.Where(r => r.PaidAt is DateTime paid && paid.Year == month.Year && paid.Month == month.Month)
+            .Sum(r => r.RentFee);
+        lblStats.Text = $"Còn trống: {free}  |  Đang thuê: {rented}  |  Phí thuê thu trong tháng {month:MM/yyyy}: {revenue:N2} ₫";
+    }
+
+    void RevenueMonth_Changed(object sender, SelectionChangedEventArgs e) { if (_ready) LoadStats(); }
+
+    void ToggleCustomer_Click(object sender, RoutedEventArgs e)
+    {
+        if (gridCustomers.SelectedItem is not User user) { MessageBox.Show("Hãy chọn tài khoản khách hàng."); return; }
+        var action = user.IsActive ? "Khóa" : "Mở khóa";
+        if (MessageBox.Show($"{action} tài khoản {user.Email}?", "Tài khoản khách hàng",
+            MessageBoxButton.YesNo, MessageBoxImage.Question) != MessageBoxResult.Yes) return;
+        UiActions.Try(() => _db.SetCustomerActive(user.Id, !user.IsActive));
+        ReloadAll();
     }
 
     void Filter_Changed(object sender, SelectionChangedEventArgs e) { if (_ready) LoadUnits(); }
@@ -95,39 +133,6 @@ public partial class AdminWindow : Window
         { MessageBox.Show("Kho này đã có lịch sử thuê nên không thể xóa."); return; }
         if (MessageBox.Show($"Xóa kho {u.Code}?", "Xác nhận", MessageBoxButton.YesNo, MessageBoxImage.Warning) != MessageBoxResult.Yes) return;
         UiActions.Try(() => _db.DeleteUnit(u.Id));
-        ReloadAll();
-    }
-
-    // ---------- CƠ SỞ ----------
-    void AddFacility_Click(object sender, RoutedEventArgs e)
-    {
-        if (!UiActions.Try(_db.Reload)) return;
-        var w = new FacilityEditWindow(null) { Owner = this };
-        if (w.ShowDialog() != true) return;
-        UiActions.Try(() => _db.SaveFacility(w.Facility, null));
-        ReloadAll();
-    }
-
-    void EditFacility_Click(object sender, RoutedEventArgs e)
-    {
-        if (e is MouseButtonEventArgs && gridFacilities.SelectedItem == null) return;
-        if (gridFacilities.SelectedItem is not Facility f) { MessageBox.Show("Hãy chọn một cơ sở."); return; }
-        if (!UiActions.Try(_db.Reload)) return;
-        f = _db.Facilities.FirstOrDefault(x => x.Id == f.Id)!;
-        if (f == null) { ReloadAll(); return; }
-        var w = new FacilityEditWindow(f) { Owner = this };
-        if (w.ShowDialog() != true) return;
-        UiActions.Try(() => _db.SaveFacility(w.Facility, f));
-        ReloadAll();
-    }
-
-    void DeleteFacility_Click(object sender, RoutedEventArgs e)
-    {
-        if (gridFacilities.SelectedItem is not Facility f) { MessageBox.Show("Hãy chọn một cơ sở."); return; }
-        if (_db.Units.Any(u => u.FacilityId == f.Id))
-        { MessageBox.Show("Cơ sở còn kho bên trong, hãy xóa/chuyển kho trước."); return; }
-        if (MessageBox.Show($"Xóa cơ sở {f.Name}?", "Xác nhận", MessageBoxButton.YesNo, MessageBoxImage.Warning) != MessageBoxResult.Yes) return;
-        UiActions.Try(() => _db.DeleteFacility(f.Id));
         ReloadAll();
     }
 

@@ -6,7 +6,11 @@
     <DockPanel>
         <Border DockPanel.Dock="Top" Background="#222B45" Padding="12,8">
             <DockPanel>
-                <Button DockPanel.Dock="Right" Content="Đăng xuất" Click="Logout_Click"/>
+                <StackPanel DockPanel.Dock="Right" Orientation="Horizontal">
+                    <Label Content="Ngày trong tháng thống kê" Foreground="White" Target="{Binding ElementName=dpRevenueMonth}"/>
+                    <DatePicker x:Name="dpRevenueMonth" Width="120" SelectedDateChanged="RevenueMonth_Changed"/>
+                    <Button Content="Đăng xuất" Click="Logout_Click"/>
+                </StackPanel>
                 <StackPanel>
                     <TextBlock x:Name="lblUser" Foreground="White" FontSize="16"/>
                     <TextBlock x:Name="lblStats" Foreground="#BBC" FontSize="12" Margin="0,2,0,0"/>
@@ -19,7 +23,7 @@
             <TabItem Header="Quản lý kho">
                 <DockPanel Margin="12">
                     <StackPanel DockPanel.Dock="Top" Orientation="Horizontal" Margin="0,0,0,8">
-                        <TextBlock Text="Cơ sở:" VerticalAlignment="Center"/>
+                        <TextBlock Text="Vị trí" VerticalAlignment="Center"/>
                         <ComboBox x:Name="cbFilter" Width="200" Margin="6,0,16,0" DisplayMemberPath="Name"
                                   SelectionChanged="Filter_Changed"/>
                         <Button Content="+ Thêm kho" Click="AddUnit_Click"/>
@@ -32,7 +36,7 @@
                               MouseDoubleClick="EditUnit_Click">
                         <DataGrid.Columns>
                             <DataGridTextColumn Header="ID" Binding="{Binding Id}" Width="50"/>
-                            <DataGridTextColumn Header="Cơ sở" Binding="{Binding FacilityName}" Width="*"/>
+                            <DataGridTextColumn Header="Vị trí" Binding="{Binding FacilityName}" Width="*"/>
                             <DataGridTextColumn Header="Mã kho" Binding="{Binding Code}" Width="100"/>
                             <DataGridTextColumn Header="Loại" Binding="{Binding Type}" Width="110"/>
                             <DataGridTextColumn Header="Diện tích (m²)" Binding="{Binding SizeM2}" Width="110"/>
@@ -43,24 +47,18 @@
                 </DockPanel>
             </TabItem>
 
-            <!-- ===== CƠ SỞ ===== -->
-            <TabItem Header="Cơ sở">
+            <TabItem Header="Khách hàng">
                 <DockPanel Margin="12">
                     <StackPanel DockPanel.Dock="Top" Orientation="Horizontal" Margin="0,0,0,8">
-                        <Button Content="+ Thêm cơ sở" Click="AddFacility_Click"/>
+                        <Button Content="Khóa hoặc mở khóa" Click="ToggleCustomer_Click"/>
                         <Button Content="Làm mới" Click="Refresh_Click"/>
-                        <Button Content="Sửa" Click="EditFacility_Click"/>
-                        <Button Content="Xóa" Click="DeleteFacility_Click"/>
                     </StackPanel>
-                    <DataGrid x:Name="gridFacilities" AutoGenerateColumns="False" IsReadOnly="True"
-                              SelectionMode="Single" CanUserAddRows="False" HeadersVisibility="Column"
-                              MouseDoubleClick="EditFacility_Click">
+                    <DataGrid x:Name="gridCustomers" AutoGenerateColumns="False" IsReadOnly="True"
+                              SelectionMode="Single" CanUserAddRows="False" HeadersVisibility="Column">
                         <DataGrid.Columns>
-                            <DataGridTextColumn Header="ID" Binding="{Binding Id}" Width="50"/>
-                            <DataGridTextColumn Header="Tên cơ sở" Binding="{Binding Name}" Width="200"/>
-                            <DataGridTextColumn Header="Địa chỉ" Binding="{Binding Address}" Width="*"/>
-                            <DataGridTextColumn Header="Số kho" Binding="{Binding UnitCount}" Width="80"/>
-                            <DataGridTextColumn Header="Còn trống" Binding="{Binding AvailableCount}" Width="90"/>
+                            <DataGridTextColumn Header="Họ tên" Binding="{Binding FullName}" Width="*"/>
+                            <DataGridTextColumn Header="Email" Binding="{Binding Email}" Width="*"/>
+                            <DataGridTextColumn Header="Trạng thái" Binding="{Binding AccountStatus}" Width="160"/>
                         </DataGrid.Columns>
                     </DataGrid>
                 </DockPanel>
@@ -80,12 +78,12 @@
                         <DataGrid.Columns>
                             <DataGridTextColumn Header="Mã" Binding="{Binding Id}" Width="50"/>
                             <DataGridTextColumn Header="Khách hàng" Binding="{Binding CustomerName}" Width="*"/>
-                            <DataGridTextColumn Header="Cơ sở" Binding="{Binding FacilityName}" Width="130"/>
+                            <DataGridTextColumn Header="Vị trí" Binding="{Binding FacilityName}" Width="130"/>
                             <DataGridTextColumn Header="Kho" Binding="{Binding UnitCode}" Width="80"/>
                             <DataGridTextColumn Header="Bắt đầu" Binding="{Binding StartDate, StringFormat=dd/MM/yyyy}" Width="90"/>
                             <DataGridTextColumn Header="Kết thúc" Binding="{Binding EndDate, StringFormat=dd/MM/yyyy}" Width="90"/>
-                            <DataGridTextColumn Header="Tổng tiền" Binding="{Binding Total, StringFormat={}{0:N2} ₫}" Width="120"/>
-                            <DataGridTextColumn Header="Thanh toán" Binding="{Binding PaymentMethod}" Width="110"/>
+                            <DataGridTextColumn Header="Đã thanh toán" Binding="{Binding PaidAmount, StringFormat={}{0:N2} ₫}" Width="120"/>
+                            <DataGridTextColumn Header="Thanh toán" Binding="{Binding PaymentStatusText}" Width="120"/>
                             <DataGridTextColumn Header="Trạng thái" Binding="{Binding StatusText}" Width="170"/>
                             <DataGridTextColumn Header="Đối soát cọc" Binding="{Binding RefundText}" Width="180"/>
                         </DataGrid.Columns>

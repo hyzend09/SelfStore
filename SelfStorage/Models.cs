@@ -9,6 +9,8 @@ public class User
     public string Email { get; set; } = "";
     public string PasswordHash { get; set; } = "";
     public string Role { get; set; } = "Customer"; // Customer | Admin
+    public bool IsActive { get; set; } = true;
+    [JsonIgnore] public string AccountStatus => IsActive ? "Hoạt động" : "Đã khóa";
 }
 
 public class Facility
@@ -33,7 +35,7 @@ public class StorageUnit
 
     [JsonIgnore] public string FacilityName =>
         DataStore.Instance.Facilities.FirstOrDefault(f => f.Id == FacilityId)?.Name ?? "";
-    [JsonIgnore] public string StatusText => IsAvailable ? "Còn trống" : "Đã thuê";
+    [JsonIgnore] public string StatusText { get; internal set; } = "Còn trống";
 }
 
 public class Rental
@@ -46,7 +48,10 @@ public class Rental
     public decimal Deposit { get; set; }
     public decimal RentFee { get; set; }
     public string PaymentMethod { get; set; } = "";
-    public DateTime PaidAt { get; set; }
+    public DateTime? PaidAt { get; set; }
+    public DateTime? HoldExpiresAt { get; set; }
+    public string? HoldOutcome { get; set; }
+    public string? TransactionCode { get; set; }
     public string QrContent { get; set; } = "";
     public bool IsReturned { get; set; }
     public DateTime? ReturnedAt { get; set; }
@@ -66,6 +71,15 @@ public class Rental
     public int? RefundedByUserId { get; set; }
     public string RefundReference { get; set; } = "";
     public bool IsLegacyRental { get; set; }
+    public decimal ExtraFee { get; set; }
+    public bool RequiresMaintenance { get; set; }
+    [JsonIgnore] public bool IsOpen => !IsReturned && HoldOutcome == null;
+    [JsonIgnore] public bool IsAwaitingPayment => IsOpen && PaidAt == null;
+    [JsonIgnore] public bool RequiresReturnQr => !IsLegacyRental || !string.IsNullOrWhiteSpace(QrContent);
+    [JsonIgnore] public decimal? PaidAmount => PaidAt != null ? Total : null;
+    [JsonIgnore] public string PaymentStatusText => PaidAt != null ? "Đã thanh toán" : "Chưa thanh toán";
+    [JsonIgnore] public DateTime? HoldDeadlineLocal => HoldExpiresAt is DateTime utc
+        ? DateTime.SpecifyKind(utc, DateTimeKind.Utc).ToLocalTime() : null;
 
     [JsonIgnore] public string CustomerName =>
         CustomerNameSnapshot;
@@ -74,13 +88,15 @@ public class Rental
     [JsonIgnore] public StorageUnit? Unit => DataStore.Instance.Units.FirstOrDefault(u => u.Id == UnitId);
     [JsonIgnore] public string UnitCode => UnitCodeSnapshot;
     [JsonIgnore] public string FacilityName => FacilityNameSnapshot;
-    [JsonIgnore] public string StatusText => IsReturned
-        ? (IsLegacyRental && RefundedAt == null ? "Đã trả (dữ liệu cũ)" : "Đã hoàn tất")
+    [JsonIgnore] public string StatusText => HoldOutcome == "Cancelled" ? "Đã hủy"
+        : HoldOutcome == "Expired" ? "Hết hạn giữ chỗ"
+        : IsAwaitingPayment ? "Chờ thanh toán"
+        : IsReturned ? (IsLegacyRental && RefundedAt == null ? "Đã trả (dữ liệu cũ)" : "Đã trả")
         : InspectedAt != null ? "Chờ hoàn cọc"
         : ReturnRequestedAt != null ? "Chờ kiểm tra trả kho"
         : EndDate.Date < DateTime.Today ? "Quá hạn"
         : ReceivedAt == null && !IsLegacyRental ? "Chờ nhận kho" : "Đang thuê";
-    [JsonIgnore] public string RefundText => RefundedAt != null ? $"Đã đối soát: {RefundAmount:N2} ₫"
+    [JsonIgnore] public string RefundText => PaidAt == null ? "—" : RefundedAt != null ? $"Đã đối soát: {RefundAmount:N2} ₫"
         : IsReturned && IsLegacyRental ? "Chưa có đối soát cọc cũ"
         : InspectedAt != null ? $"Chờ hoàn: {RefundAmount:N2} ₫" : "Chưa kiểm tra";
 }

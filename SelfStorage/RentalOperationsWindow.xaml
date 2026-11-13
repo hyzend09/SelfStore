@@ -9,16 +9,17 @@
             <TextBlock x:Name="lblAmounts" TextWrapping="Wrap" Margin="0,0,0,12"/>
             <StackPanel x:Name="pickupPanel">
                 <TextBlock Text="Quét bằng đầu đọc QR hoặc dán nội dung mã của khách:" TextWrapping="Wrap"/>
-                <TextBox x:Name="txtQr" Padding="6" Margin="0,4" MaxLength="1000"/>
-                <Button Content="Kiểm tra QR" HorizontalAlignment="Left" Click="Verify_Click"/>
+                <TextBox x:Name="txtQr" Padding="6" Margin="0,4" MaxLength="1000" AutomationProperties.Name="Mã QR của khách"/>
+                <Button x:Name="btnVerify" Content="Kiểm tra QR bàn giao" HorizontalAlignment="Left" Click="Verify_Click"/>
                 <TextBlock x:Name="lblVerified" TextWrapping="Wrap" Foreground="Green" Margin="0,4,0,8"/>
             </StackPanel>
             <StackPanel x:Name="inspectionPanel">
-                <TextBlock Text="Khấu trừ từ tiền cọc (₫, tối đa bằng tiền cọc):"/>
-                <TextBox x:Name="txtDeduction" Text="0" Padding="6" Margin="0,4,0,10"/>
-                <TextBlock Text="Biên bản kiểm tra / lý do khấu trừ:"/>
+                <TextBlock Text="Phí phát sinh (₫)"/>
+                <TextBox x:Name="txtDeduction" Text="0" Padding="6" Margin="0,4,0,10" AutomationProperties.Name="Phí phát sinh"/>
+                <TextBlock Text="Tình trạng kho và lý do tính phí"/>
                 <TextBox x:Name="txtNotes" AcceptsReturn="True" TextWrapping="Wrap" Height="100" VerticalScrollBarVisibility="Auto" Padding="6" Margin="0,4,0,10" MaxLength="1000"/>
-                <TextBlock Text="Kho vẫn được giữ trong lúc chờ hoàn cọc." Foreground="Gray" TextWrapping="Wrap"/>
+                <CheckBox x:Name="chkMaintenance" Content="Chuyển kho sang bảo trì sau khi đối soát cọc" Margin="0,0,0,8"/>
+                <TextBlock Text="Phí được khấu trừ tối đa bằng tiền cọc. Phần vượt cọc được ghi riêng để Admin xử lý." Foreground="Gray" TextWrapping="Wrap"/>
             </StackPanel>
             <StackPanel x:Name="refundPanel">
                 <TextBlock x:Name="lblInspection" TextWrapping="Wrap" Margin="0,0,0,12"/>
@@ -27,8 +28,9 @@
                 <CheckBox x:Name="chkConfirmed" Margin="0,4">
                     <TextBlock Text="Tôi đã hoàn tiền thực tế cho khách, hoặc đã đối soát khoản cọc không còn số dư." TextWrapping="Wrap"/>
                 </CheckBox>
-                <TextBlock Text="Thao tác này ghi nhận đối soát; ứng dụng không tự chuyển tiền ngân hàng. Sau xác nhận, kho được mở cho thuê lại." TextWrapping="Wrap" Foreground="Gray" Margin="0,8"/>
+                <TextBlock Text="Xác nhận sẽ đóng đơn và cập nhật trạng thái kho theo biên bản kiểm tra." TextWrapping="Wrap" Foreground="Gray" Margin="0,8"/>
             </StackPanel>
+            <TextBlock x:Name="lblValidation" Foreground="#A31B1B" TextWrapping="Wrap" AutomationProperties.LiveSetting="Polite"/>
             <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,16,0,0">
                 <Button Content="Hủy" IsCancel="True"/>
                 <Button x:Name="btnConfirm" Click="Confirm_Click"/>

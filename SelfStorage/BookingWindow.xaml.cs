@@ -17,7 +17,7 @@ public partial class BookingWindow : Window
         dpStart.DisplayDateStart = DateTime.Today;
         dpStart.DisplayDateEnd = DateTime.Today.AddYears(5);
         dpStart.SelectedDate = DateTime.Today;
-        cbMonths.ItemsSource = new[] { 1, 3, 6, 12 };
+        cbMonths.ItemsSource = Enumerable.Range(1, 12);
         cbMonths.SelectedIndex = 0;
     }
 
@@ -40,31 +40,11 @@ public partial class BookingWindow : Window
         { MessageBox.Show("Ngày bắt đầu không hợp lệ."); return; }
         if (start.Date > DateTime.Today.AddYears(5) || cbMonths.SelectedItem is not int months)
         { MessageBox.Show("Chọn ngày trong vòng 5 năm và thời hạn thuê hợp lệ."); return; }
-        if (!UiActions.Try(_db.Reload)) return;
-        var latest = _db.Units.FirstOrDefault(u => u.Id == _unit.Id);
-        if (latest == null || !latest.IsAvailable)
-        { MessageBox.Show("Kho vừa được người khác thuê."); DialogResult = false; return; }
-        if (latest.PricePerMonth != _unit.PricePerMonth)
-        { MessageBox.Show("Giá thuê đã đổi. Hãy đóng cửa sổ và chọn lại kho."); return; }
-
-        var rental = new Rental
-        {
-            Id = _db.NextRentalId(),
-            UserId = _db.CurrentUser!.Id,
-            UnitId = _unit.Id,
-            StartDate = start.Date,
-            Months = months,
-            Deposit = Deposit,
-            RentFee = RentFee
-        };
-
-        var pay = new PaymentWindow(rental) { Owner = this };
-        if (pay.ShowDialog() != true) return;
-
-        // Thanh toán thành công -> chốt đơn
-        if (!UiActions.Try(() => rental = _db.Book(_unit.Id, start, months, _unit.PricePerMonth, pay.SelectedMethod))) return;
-
-        new QrWindow(rental) { Owner = Owner }.ShowDialog();
+        Rental rental = null!;
+        if (!UiActions.Try(() => rental = _db.CreateHold(_unit.Id, start, months, _unit.PricePerMonth))) return;
+        var pay = new PaymentWindow(rental, _db) { Owner = this };
+        if (pay.ShowDialog() == true && pay.PaidRental is Rental paid)
+            new QrWindow(paid) { Owner = this }.ShowDialog();
         DialogResult = true;
     }
 }

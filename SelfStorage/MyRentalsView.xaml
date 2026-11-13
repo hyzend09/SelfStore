@@ -6,8 +6,10 @@
             <TextBlock x:Name="lblDetails" TextWrapping="Wrap"/>
             <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
                 <Button Content="Làm mới" Click="Refresh_Click"/>
-                <Button Content="Xem mã QR nhận kho" Click="Qr_Click"/>
-                <Button Content="Yêu cầu trả kho" Click="Return_Click"/>
+                <Button x:Name="btnPayHold" Content="Thanh toán đơn" Click="PayHold_Click" IsEnabled="False"/>
+                <Button x:Name="btnCancelHold" Content="Hủy giữ chỗ" Click="CancelHold_Click" IsEnabled="False"/>
+                <Button x:Name="btnQr" Content="Xem mã QR" Click="Qr_Click" IsEnabled="False"/>
+                <Button x:Name="btnReturn" Content="Yêu cầu trả kho" Click="Return_Click" IsEnabled="False"/>
             </StackPanel>
         </StackPanel>
         <DataGrid x:Name="grid" AutoGenerateColumns="False" IsReadOnly="True" SelectionMode="Single"
@@ -18,7 +20,7 @@
                 <DataGridTextColumn Header="Kho" Binding="{Binding UnitCode}" Width="90"/>
                 <DataGridTextColumn Header="Bắt đầu" Binding="{Binding StartDate, StringFormat=dd/MM/yyyy}" Width="100"/>
                 <DataGridTextColumn Header="Kết thúc" Binding="{Binding EndDate, StringFormat=dd/MM/yyyy}" Width="100"/>
-                <DataGridTextColumn Header="Đã thanh toán" Binding="{Binding Total, StringFormat={}{0:N2} ₫}" Width="130"/>
+                <DataGridTextColumn Header="Đã thanh toán" Binding="{Binding PaidAmount, StringFormat={}{0:N2} ₫}" Width="130"/>
                 <DataGridTextColumn Header="Trạng thái" Binding="{Binding StatusText}" Width="170"/>
                 <DataGridTextColumn Header="Đối soát cọc" Binding="{Binding RefundText}" Width="180"/>
             </DataGrid.Columns>

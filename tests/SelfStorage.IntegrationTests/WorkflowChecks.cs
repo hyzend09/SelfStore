@@ -36,25 +36,25 @@ internal static class WorkflowChecks
         var other = DataStore.Open(connection);
         other.CurrentUser = other.Users.Single(u => u.Email == "other@example.com");
         Expect(() => other.RequestReturn(rental.Id), "cannot return another customer's rental");
-        Expect(() => admin.InspectReturn(rental.Id, 0, "OK"), "cannot inspect before return request");
+        Expect(() => admin.InspectReturn(rental.Id, 0, "OK", rental.QrContent, false), "cannot inspect before return request");
         customer.RequestReturn(rental.Id);
         var requested = DataStore.Open(connection);
         Check(requested.Rentals.Single().ReturnRequestedAt != null && !requested.Units.Single(u => u.Id == 1).IsAvailable
             && !requested.Rentals.Single().IsReturned, "request does not release the unit");
         Expect(() => customer.RequestReturn(rental.Id), "duplicate return request rejected");
-        Expect(() => customer.InspectReturn(rental.Id, 0, "OK"), "inspection requires admin");
-        Expect(() => admin.InspectReturn(rental.Id, -1, "bad"), "negative deduction rejected");
-        Expect(() => admin.InspectReturn(rental.Id, rental.Deposit + 1, "bad"), "deduction cannot exceed deposit");
-        Expect(() => admin.InspectReturn(rental.Id, 0.001m, "bad"), "deduction precision validated");
-        Expect(() => admin.InspectReturn(rental.Id, 10, ""), "inspection report is required");
+        Expect(() => customer.InspectReturn(rental.Id, 0, "OK", rental.QrContent, false), "inspection requires admin");
+        Expect(() => admin.InspectReturn(rental.Id, -1, "bad", rental.QrContent, false), "negative deduction rejected");
+        Expect(() => admin.InspectReturn(rental.Id, 0, "OK"), "old inspection overload cannot bypass a required QR");
+        Expect(() => admin.InspectReturn(rental.Id, 0.001m, "bad", rental.QrContent, false), "deduction precision validated");
+        Expect(() => admin.InspectReturn(rental.Id, 10, "", rental.QrContent, false), "inspection report is required");
         Expect(() => admin.ConfirmRefund(rental.Id, "premature"), "cannot settle before inspection");
-        admin.InspectReturn(rental.Id, 10.12m, "Khấu trừ vệ sinh: 10,12 đồng");
+        admin.InspectReturn(rental.Id, 10.12m, "Khấu trừ vệ sinh: 10,12 đồng", rental.QrContent, false);
         var inspected = DataStore.Open(connection);
         var pending = inspected.Rentals.Single();
         Check(pending.RefundAmount == 123446.66m && pending.InspectedByUserId == 1 && pending.InspectedAt != null
             && pending.InspectionNotes.Contains("vệ sinh") && pending.StatusText == "Chờ hoàn cọc"
             && !inspected.Units.Single(u => u.Id == 1).IsAvailable, "inspection persists exact refund and keeps unit held");
-        Expect(() => admin.InspectReturn(rental.Id, 0, "again"), "inspection cannot be overwritten");
+        Expect(() => admin.InspectReturn(rental.Id, 0, "again", rental.QrContent, false), "inspection cannot be overwritten");
         Expect(() => customer.ConfirmRefund(rental.Id, "unauthorized"), "refund requires admin");
         Expect(() => admin.ConfirmRefund(rental.Id, ""), "refund requires payment reference");
         admin.ConfirmRefund(rental.Id, "BANK-0001");
@@ -74,7 +74,7 @@ internal static class WorkflowChecks
             var item = customer.Book(unitId, DateTime.Today, 1, price, "Chuyển khoản");
             admin.ReceiveRental(item.QrContent, item.Id);
             customer.RequestReturn(item.Id);
-            admin.InspectReturn(item.Id, fullDeduction ? item.Deposit : 0, fullDeduction ? "Hư hỏng bằng tiền cọc" : "Kho tốt");
+            admin.InspectReturn(item.Id, fullDeduction ? item.Deposit : 0, fullDeduction ? "Hư hỏng bằng tiền cọc" : "Kho tốt", item.QrContent, false);
             admin.ConfirmRefund(item.Id, fullDeduction ? "" : "CASH-0001");
             var saved = DataStore.Open(connection).Rentals.Single(r => r.Id == item.Id);
             Check(saved.RefundAmount == (fullDeduction ? 0 : item.Deposit) && saved.RefundedAt != null,
@@ -111,8 +111,8 @@ internal static class WorkflowChecks
         var right = DataStore.Open(connection); right.CurrentUser = right.Users.Single(u => u.Id == 2);
         using var barrier = new Barrier(2);
         var race = await Task.WhenAll(Task.Run(() => Race(left)), Task.Run(() => Race(right)));
-        Check(race.Count(x => x) == 1 && DataStore.Open(connection).Rentals.Count(r => r.UnitId == 6 && !r.IsReturned) == 1,
-            "simultaneous booking commits once");
+        Check(race.Count(x => x) == 1 && DataStore.Open(connection).Rentals.Count(r => r.UnitId == 6 && r.IsAwaitingPayment) == 1,
+            "simultaneous holds commit once");
         Check(left.CurrentUser != null && right.CurrentUser != null, "conflicting client stays usable");
 
         var legacyConnection = newDatabase();
@@ -134,13 +134,69 @@ internal static class WorkflowChecks
         migrated.CurrentUser = migrated.Users.Single(u => u.Id == 2);
         migrated.RequestReturn(1);
         Check(DataStore.Open(legacyConnection).Rentals[0].ReturnRequestedAt != null, "legacy active rental can request return");
-        Check((int)Scalar(legacyConnection, "SELECT SchemaVersion FROM dbo.StoreState") == 2, "schema upgraded to version 2");
+        Check((int)Scalar(legacyConnection, "SELECT SchemaVersion FROM dbo.StoreState") == 3, "schema upgraded to version 3");
+        Check((int)Scalar(legacyConnection, "SELECT COUNT(*) FROM dbo.Payments") == 0 && migrated.Rentals.All(r => r.PaidAt != null),
+            "migration preserves historical paid dates without inventing transaction codes");
+        migrated.CurrentUser = migrated.Users.Single(u => u.Id == 1);
+        Expect(() => migrated.InspectReturn(1, 0, "Kho cũ"), "legacy rental with an existing QR still requires that QR");
+        Sql(legacyConnection, "UPDATE dbo.Rentals SET QrContent = N'' WHERE Id = 1; UPDATE dbo.StoreState SET Revision = Revision + 1;");
+        migrated.InspectReturn(1, 0, "Đơn cũ chưa từng có QR");
+        Check(migrated.Rentals.Single(r => r.Id == 1).InspectedAt != null, "legacy rental without QR remains returnable");
+
+        decimal Price(int id) => customer.Units.Single(u => u.Id == id).PricePerMonth;
+        var hold = customer.CreateHold(7, DateTime.Today, 2, Price(7));
+        Check(hold.IsAwaitingPayment && hold.QrContent == "" && hold.HoldExpiresAt.HasValue, "hold is persisted before payment without a QR");
+        Expect(() => customer.CreateHold(7, DateTime.Today.AddMonths(3), 1, Price(7)), "hold reserves the concrete unit even for a later interval");
+        Expect(() => admin.VerifyPickup(hold.QrContent), "unpaid hold cannot be handed over");
+        customer.CancelHold(hold.Id);
+        var replacement = customer.CreateHold(7, DateTime.Today, 1, Price(7));
+        Check(customer.Rentals.Single(r => r.Id == hold.Id).HoldOutcome == "Cancelled", "cancel preserves history and releases unit");
+        Sql(connection, $"UPDATE dbo.Rentals SET HoldExpiresAt = DATEADD(second,-1,SYSUTCDATETIME()) WHERE Id = {replacement.Id}");
+        Expect(() => customer.PayHeldRental(replacement.Id, "Chuyển khoản", Guid.NewGuid().ToString("N")), "expired hold cannot be paid");
+        Check(customer.Rentals.Single(r => r.Id == replacement.Id).HoldOutcome == "Expired" && customer.Units.Single(u => u.Id == 7).IsAvailable,
+            "expiry persists and releases unit even when attempted payment is rejected");
+
+        var validHold = customer.CreateHold(7, DateTime.Today, 1, Price(7));
+        var otherHold = customer.CreateHold(8, DateTime.Today, 1, Price(8));
+        string code = Guid.NewGuid().ToString("N");
+        using var paymentBarrier = new Barrier(2);
+        var concurrentPayments = await Task.WhenAll(Task.Run(() => Pay(left)), Task.Run(() => Pay(right)));
+        var paidHold = concurrentPayments[0];
+        Check(concurrentPayments.All(r => r.QrContent == paidHold.QrContent), "simultaneous retries return the same committed payment");
+        Check(paidHold.QrContent != "" && paidHold.QrContent == customer.PayHeldRental(validHold.Id, "Chuyển khoản", code).QrContent,
+            "retry returns the same payment and QR");
+        Expect(() => customer.PayHeldRental(otherHold.Id, "Chuyển khoản", code), "same transaction cannot pay a different hold");
+        Check((int)Scalar(connection, $"SELECT COUNT(*) FROM dbo.Payments WHERE Id = {validHold.Id}") == 1, "exactly one payment row per paid hold");
+        Expect(() => customer.CancelHold(validHold.Id), "paid bookings cannot be canceled as holds");
+        admin.ReceiveRental(paidHold.QrContent, paidHold.Id);
+        customer.RequestReturn(paidHold.Id);
+        Expect(() => admin.InspectReturn(paidHold.Id, 5, "Kho tốt", null, true), "return rejects null QR");
+        Expect(() => admin.InspectReturn(paidHold.Id, 5, "Kho tốt", "  ", true), "return rejects blank QR");
+        Expect(() => admin.InspectReturn(paidHold.Id, 0, "Kho tốt", "wrong QR", false), "return rejects a mismatched QR");
+        var beforeInspection = DataStore.Open(connection).Rentals.Single(r => r.Id == paidHold.Id);
+        Check(beforeInspection.InspectedAt == null && beforeInspection.ExtraFee == 0 && !beforeInspection.RequiresMaintenance,
+            "failed QR validation does not alter rental or fees");
+        admin.InspectReturn(paidHold.Id, paidHold.Deposit + 25, "Hư hỏng, cần sửa chữa", paidHold.QrContent, true);
+        admin.ConfirmRefund(paidHold.Id, "");
+        var closedDamage = admin.Rentals.Single(r => r.Id == paidHold.Id);
+        Check(closedDamage.ExtraFee - closedDamage.Deduction == 25 && closedDamage.RefundAmount == 0 &&
+            admin.Units.Single(u => u.Id == 7).StatusText == "Bảo trì", "damage above deposit is recorded and unit enters maintenance");
+
+        admin.SetCustomerActive(customer.CurrentUser!.Id, false);
+        Expect(() => customer.CancelHold(otherHold.Id), "locking a customer invalidates an already open session");
+        Check(DataStore.Open(connection).Users.Single(u => u.Id == 2).IsActive == false, "customer lock persists");
 
         bool Race(DataStore data)
         {
             barrier.SignalAndWait();
-            try { data.Book(6, DateTime.Today, 1, 650000, "Thẻ ngân hàng"); return true; }
+            try { data.CreateHold(6, DateTime.Today, 1, 650000); return true; }
             catch (Exception ex) when (ex is InvalidOperationException or StoreConcurrencyException) { return false; }
+        }
+
+        Rental Pay(DataStore data)
+        {
+            paymentBarrier.SignalAndWait();
+            return data.PayHeldRental(validHold.Id, "Chuyển khoản", code);
         }
     }
 

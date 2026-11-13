@@ -3,7 +3,7 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         Width="380" SizeToContent="Height" WindowStartupLocation="CenterOwner" ResizeMode="NoResize">
     <StackPanel Margin="20">
-        <TextBlock Text="Cơ sở"/>
+        <TextBlock Text="Vị trí"/>
         <ComboBox x:Name="cbFacility" DisplayMemberPath="Name" Margin="0,2,0,8"/>
         <TextBlock Text="Mã kho"/>
         <TextBox x:Name="txtCode" Margin="0,2,0,8" Padding="4"/>
@@ -13,7 +13,7 @@
         <TextBox x:Name="txtSize" Margin="0,2,0,8" Padding="4"/>
         <TextBlock Text="Giá thuê / tháng (₫)"/>
         <TextBox x:Name="txtPrice" Margin="0,2,0,8" Padding="4"/>
-        <CheckBox x:Name="chkAvail" Content="Còn trống (sẵn sàng cho thuê)" IsChecked="True" Margin="0,2,0,0"/>
+        <CheckBox x:Name="chkAvail" Content="Sẵn sàng cho thuê (bỏ chọn để đưa vào bảo trì)" IsChecked="True" Margin="0,2,0,0"/>
         <TextBlock x:Name="lblNote" Foreground="Gray" FontSize="11" TextWrapping="Wrap"/>
         <TextBlock x:Name="lblError" Foreground="Red" TextWrapping="Wrap" Margin="0,8,0,0"/>
         <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,12,0,0">

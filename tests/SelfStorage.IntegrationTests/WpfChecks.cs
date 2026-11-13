@@ -57,8 +57,10 @@ internal static class WpfChecks
                     external.CurrentUser = external.Users.Single(u => u.Id == 1);
                     external.SaveFacility(new Facility { Name = "Cơ sở từ máy khác", Address = "Test" }, null);
                     Click(adminWindow, "Refresh_Click");
-                    var facilityGrid = Field<DataGrid>(adminWindow, "gridFacilities");
-                    Check(facilityGrid.Items.Cast<Facility>().Any(f => f.Name == "Cơ sở từ máy khác"), "admin refresh reads external SQL changes");
+                    var locationFilter = Field<ComboBox>(adminWindow, "cbFilter");
+                    Check(locationFilter.Items.Cast<Facility>().Any(f => f.Name == "Cơ sở từ máy khác"), "admin refresh reads external location data");
+                    Check(Field<DataGrid>(adminWindow, "gridCustomers").Items.Cast<User>().All(u => u.Role == "Customer"),
+                        "admin customer grid excludes administrators");
                     adminWindow.Close();
 
                     db.CurrentUser = db.Users.Single(u => u.Id == 2);
@@ -76,6 +78,11 @@ internal static class WpfChecks
                         Field<TextBox>(inspection, "txtDeduction").Text = "10";
                         Field<TextBox>(inspection, "txtNotes").Text = "Kiểm tra giao diện: vệ sinh";
                         Click(inspection, "Confirm_Click");
+                        Check(inspection.IsVisible && Field<TextBlock>(inspection, "lblValidation").Text.Contains("QR") &&
+                            DataStore.Open(connection).Rentals.Single(r => r.Id == rental.Id).InspectedAt == null,
+                            "WPF inspection stays open and explains missing QR");
+                        Field<TextBox>(inspection, "txtQr").Text = rental.QrContent;
+                        Click(inspection, "Confirm_Click");
                     }) == true, "WPF inspection form saves report");
                     var refund = new RentalOperationsWindow(rental.Id, RentalOperation.Refund);
                     Check(Dialog(refund, () =>
@@ -90,6 +97,12 @@ internal static class WpfChecks
                     grid.SelectedIndex = 0;
                     Check(Field<TextBlock>(mine, "lblDetails").Text.Contains("UI-REFUND-01"), "customer sees settlement reference");
                     var browse = new BrowseView();
+                    Field<TextBox>(browse, "txtMinArea").Text = "5";
+                    Field<TextBox>(browse, "txtMaxPrice").Text = "700000";
+                    Click(browse, "Filter_Changed");
+                    var visibleUnits = Field<DataGrid>(browse, "grid").Items.Cast<StorageUnit>().ToList();
+                    Check(visibleUnits.Count > 0 && visibleUnits.All(u => u.SizeM2 >= 5 && u.PricePerMonth <= 700000),
+                        "customer combines size and price filters");
                     var customerWindow = new MainWindow();
                     customerWindow.Close();
                     Check(unhandled.Count == 0, "customer and admin WPF views initialize without errors");
@@ -99,7 +112,23 @@ internal static class WpfChecks
                     Check(uiBooked.ReceivedAt == null && uiBooked.StatusText == "Chờ nhận kho", "WPF booking persists pending pickup");
                     var canceledBooking = new BookingWindow(db.Units.Single(u => u.Id == 3));
                     DriveBooking(canceledBooking, confirm: false);
-                    Check(!DataStore.Open(connection).Rentals.Any(r => r.UnitId == 3), "canceling payment creates no rental");
+                    var unpaid = DataStore.Open(connection).Rentals.Single(r => r.UnitId == 3);
+                    Check(unpaid.IsAwaitingPayment && unpaid.QrContent == "", "closing payment preserves the unpaid hold without issuing a QR");
+                    mine.Reload();
+                    grid.SelectedItem = grid.Items.Cast<Rental>().Single(r => r.Id == unpaid.Id);
+                    DrivePayment(mine.Dispatcher, () => Click(mine, "PayHold_Click"), confirm: true);
+                    var resumed = DataStore.Open(connection).Rentals.Single(r => r.Id == unpaid.Id);
+                    Check(resumed.PaidAt != null && resumed.QrContent != "", "customer resumes payment for the same hold and receives QR");
+                    db.CurrentUser = db.Users.Single(u => u.Id == 1);
+                    var monthly = new AdminWindow();
+                    var monthPicker = Field<DatePicker>(monthly, "dpRevenueMonth");
+                    var summary = Field<TextBlock>(monthly, "lblStats");
+                    decimal paidRent = db.Rentals.Where(r => r.PaidAt != null).Sum(r => r.RentFee);
+                    Check(summary.Text.Contains($"{paidRent:N2} ₫"), "admin monthly revenue sums rent without deposits");
+                    monthPicker.SelectedDate = DateTime.Today.AddMonths(-1);
+                    Check(summary.Text.Contains($"{0m:N2} ₫"), "admin monthly revenue follows the selected month");
+                    monthly.Close();
+                    db.CurrentUser = db.Users.Single(u => u.Id == 2);
                     external.ReceiveRental(uiBooked.QrContent, uiBooked.Id);
                     mine.Reload();
                     Check(Field<DataGrid>(mine, "grid").Items.Cast<Rental>().Single(r => r.Id == uiBooked.Id).ReceivedAt != null,
@@ -127,28 +156,27 @@ internal static class WpfChecks
     }
 
     static bool? DriveBooking(BookingWindow booking, bool confirm)
+        => Dialog(booking, () => DrivePayment(booking.Dispatcher, () => Click(booking, "Pay_Click"), confirm));
+
+    static void DrivePayment(Dispatcher dispatcher, Action openPayment, bool confirm)
     {
-        return Dialog(booking, () =>
+        bool clickedPayment = false;
+        var driver = new DispatcherTimer(DispatcherPriority.Normal, dispatcher) { Interval = TimeSpan.FromMilliseconds(20) };
+        driver.Tick += (_, _) =>
         {
-            bool clickedPayment = false;
-            var driver = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(20) };
-            driver.Tick += (_, _) =>
+            var payment = Application.Current.Windows.OfType<PaymentWindow>().FirstOrDefault(w => w.IsVisible);
+            if (payment != null && !clickedPayment)
             {
-                var payment = Application.Current.Windows.OfType<PaymentWindow>().FirstOrDefault(w => w.IsVisible);
-                if (payment != null && !clickedPayment)
-                {
-                    clickedPayment = true;
-                    if (confirm) Click(payment, "Confirm_Click");
-                    else payment.DialogResult = false;
-                }
-                var qr = Application.Current.Windows.OfType<QrWindow>().FirstOrDefault(w => w.IsVisible);
-                if (qr != null) qr.DialogResult = true;
-            };
-            driver.Start();
-            try { Click(booking, "Pay_Click"); }
-            finally { driver.Stop(); }
-            if (!confirm) booking.DialogResult = false;
-        });
+                clickedPayment = true;
+                if (confirm) Click(payment, "Confirm_Click");
+                else payment.DialogResult = false;
+            }
+            var qr = Application.Current.Windows.OfType<QrWindow>().FirstOrDefault(w => w.IsVisible);
+            if (qr != null) qr.DialogResult = true;
+        };
+        driver.Start();
+        try { openPayment(); }
+        finally { driver.Stop(); }
     }
     static T Field<T>(FrameworkElement control, string name) => (T)control.FindName(name);
     static void Click(object target, string method) => target.GetType().GetMethod(method, BindingFlags.Instance | BindingFlags.NonPublic)!

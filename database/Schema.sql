@@ -67,7 +67,7 @@ BEGIN
     CREATE INDEX IX_Rentals_UserId ON dbo.Rentals(UserId);
 END;
 
-IF EXISTS (SELECT 1 FROM dbo.StoreState WHERE SchemaVersion NOT IN (1, 2))
+IF EXISTS (SELECT 1 FROM dbo.StoreState WHERE SchemaVersion NOT IN (1, 2, 3))
     THROW 50003, 'Unsupported SelfStorage schema version.', 1;
 
 IF EXISTS (SELECT 1 FROM dbo.StoreState WHERE Id = 1 AND SchemaVersion = 1)
@@ -100,5 +100,31 @@ BEGIN
             (RefundedAt IS NULL OR (InspectedAt IS NOT NULL AND IsReturned = 1 AND LEN(LTRIM(RTRIM(RefundReference))) > 0)) AND
             (IsReturned = 0 OR IsLegacyRental = 1 OR RefundedAt IS NOT NULL));');
     UPDATE dbo.StoreState SET SchemaVersion = 2, Revision = CASE WHEN Revision = 0 THEN 0 ELSE Revision + 1 END WHERE Id = 1;
+END;
+IF EXISTS (SELECT 1 FROM dbo.StoreState WHERE Id = 1 AND SchemaVersion = 2)
+BEGIN
+    ALTER TABLE dbo.Users ADD IsActive bit NOT NULL CONSTRAINT DF_Users_IsActive DEFAULT 1;
+    ALTER TABLE dbo.Rentals ALTER COLUMN PaidAt datetime2 NULL;
+    ALTER TABLE dbo.Rentals ADD
+        HoldExpiresAt datetime2 NULL,
+        HoldOutcome varchar(12) NULL,
+        ExtraFee decimal(18,2) NOT NULL CONSTRAINT DF_Rentals_ExtraFee DEFAULT 0,
+        RequiresMaintenance bit NOT NULL CONSTRAINT DF_Rentals_Maintenance DEFAULT 0;
+    DROP INDEX UX_Rentals_ActiveUnit ON dbo.Rentals;
+    EXEC(N'CREATE UNIQUE INDEX UX_Rentals_ActiveUnit ON dbo.Rentals(UnitId)
+        WHERE IsReturned = 0 AND HoldOutcome IS NULL;
+        ALTER TABLE dbo.Rentals ADD CONSTRAINT CK_Rentals_Hold CHECK (
+            (PaidAt IS NOT NULL AND HoldOutcome IS NULL) OR
+            (PaidAt IS NULL AND HoldExpiresAt IS NOT NULL AND QrContent = N'''' AND IsReturned = 0
+                AND ReceivedAt IS NULL AND ReturnRequestedAt IS NULL AND (HoldOutcome IS NULL OR HoldOutcome IN (''Cancelled'', ''Expired''))));
+        ALTER TABLE dbo.Rentals ADD CONSTRAINT CK_Rentals_ExtraFee CHECK (ExtraFee >= 0);');
+    CREATE TABLE dbo.Payments (
+        Id int NOT NULL CONSTRAINT PK_Payments PRIMARY KEY CONSTRAINT FK_Payments_Rentals REFERENCES dbo.Rentals(Id) ON DELETE CASCADE,
+        Amount decimal(19,2) NOT NULL CONSTRAINT CK_Payments_Amount CHECK (Amount >= 0),
+        TransactionCode varchar(80) COLLATE Latin1_General_100_CI_AS NOT NULL CONSTRAINT UQ_Payments_TransactionCode UNIQUE,
+        Method nvarchar(100) NOT NULL,
+        PaidAt datetime2 NOT NULL
+    );
+    UPDATE dbo.StoreState SET SchemaVersion = 3, Revision = CASE WHEN Revision = 0 THEN 0 ELSE Revision + 1 END WHERE Id = 1;
 END;
 COMMIT;

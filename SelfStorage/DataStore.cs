@@ -16,6 +16,8 @@ public partial class DataStore
     public static DataStore Instance => Default.Value;
     SqlServerStore? _store;
     internal long Revision { get; set; }
+    internal DateTime DatabaseUtcNow { get; set; }
+    internal int? PayingRentalId { get; set; }
 
     public List<User> Users { get; set; } = new();
     public List<Facility> Facilities { get; set; } = new();
@@ -35,6 +37,7 @@ public partial class DataStore
         if (_store == null) throw new InvalidOperationException("DataStore chưa kết nối SQL Server.");
         CaptureMissingSnapshots();
         _store.Save(this);
+        UpdateUnitStatuses();
     }
 
     public void Reload()
@@ -47,7 +50,9 @@ public partial class DataStore
         Units = loaded.Units;
         Rentals = loaded.Rentals;
         Revision = loaded.Revision;
-        CurrentUser = userId == null ? null : Users.FirstOrDefault(u => u.Id == userId);
+        DatabaseUtcNow = loaded.DatabaseUtcNow;
+        CurrentUser = userId == null ? null : Users.FirstOrDefault(u => u.Id == userId && u.IsActive);
+        UpdateUnitStatuses();
     }
 
     public void Change(Action<DataStore> mutation)
@@ -60,6 +65,15 @@ public partial class DataStore
             try { Reload(); } catch { /* Keep the original error for the caller. */ }
             throw;
         }
+        finally { PayingRentalId = null; }
+    }
+
+    void UpdateUnitStatuses()
+    {
+        var occupied = Rentals.Where(r => r.IsOpen).ToDictionary(r => r.UnitId);
+        foreach (var unit in Units)
+            unit.StatusText = unit.IsAvailable ? "Còn trống" : !occupied.TryGetValue(unit.Id, out var rental)
+                ? "Bảo trì" : rental.ReceivedAt != null || rental.IsLegacyRental ? "Đang thuê" : "Đã đặt";
     }
 
     void CaptureMissingSnapshots()
@@ -106,6 +120,7 @@ public partial class DataStore
             db.Save();
         }
         db._store = store;
+        db.UpdateUnitStatuses();
         return db;
     }
 

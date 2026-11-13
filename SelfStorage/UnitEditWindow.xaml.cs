@@ -35,11 +35,11 @@ public partial class UnitEditWindow : Window
             chkAvail.IsChecked = Unit.IsAvailable;
 
             // Kho đang có khách thuê thì không cho đổi trạng thái / cơ sở
-            if (_db.Rentals.Any(r => r.UnitId == Unit.Id && !r.IsReturned))
+            if (_db.Rentals.Any(r => r.UnitId == Unit.Id && r.IsOpen))
             {
                 chkAvail.IsEnabled = false;
                 cbFacility.IsEnabled = false;
-                lblNote.Text = "Kho đang có khách thuê: không đổi được trạng thái và cơ sở.";
+                lblNote.Text = $"{Unit.StatusText}. Có thể đổi vị trí và trạng thái sau khi đơn kết thúc.";
             }
         }
     }

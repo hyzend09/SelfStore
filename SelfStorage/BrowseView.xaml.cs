@@ -33,6 +33,12 @@ public partial class BrowseView : UserControl
     {
         if (!_ready) return;
         if (!UiActions.Try(_db.Reload)) return;
+        ShowUnits();
+    }
+
+    internal void ShowUnits()
+    {
+        var selectedId = (grid.SelectedItem as StorageUnit)?.Id;
         var facilityId = (cbFacility.SelectedItem as Facility)?.Id ?? 0;
         var type = cbType.SelectedItem as string ?? "Tất cả";
         _ready = false;
@@ -50,7 +56,23 @@ public partial class BrowseView : UserControl
         if (cbType.SelectedItem is string t && t != "Tất cả") q = q.Where(u => u.Type == t);
         if (chkAvail.IsChecked == true) q = q.Where(u => u.IsAvailable);
 
-        grid.ItemsSource = q.OrderBy(u => u.FacilityId).ThenBy(u => u.PricePerMonth).ToList();
+        lblFilterError.Text = "";
+        if (!string.IsNullOrWhiteSpace(txtMinArea.Text))
+        {
+            if (double.TryParse(txtMinArea.Text, out var minArea) && double.IsFinite(minArea) && minArea > 0)
+                q = q.Where(u => u.SizeM2 >= minArea);
+            else lblFilterError.Text = "Diện tích tối thiểu phải là số lớn hơn 0.";
+        }
+        if (!string.IsNullOrWhiteSpace(txtMaxPrice.Text))
+        {
+            if (decimal.TryParse(txtMaxPrice.Text, out var maxPrice) && DataStore.ValidMoney(maxPrice))
+                q = q.Where(u => u.PricePerMonth <= maxPrice);
+            else lblFilterError.Text += (lblFilterError.Text.Length == 0 ? "" : " ") + "Giá tối đa phải là số tiền hợp lệ.";
+        }
+
+        var units = lblFilterError.Text.Length == 0 ? q.OrderBy(u => u.FacilityId).ThenBy(u => u.PricePerMonth).ToList() : [];
+        grid.ItemsSource = units;
+        grid.SelectedItem = units.FirstOrDefault(u => u.Id == selectedId);
     }
 
     void Book_Click(object sender, RoutedEventArgs e)

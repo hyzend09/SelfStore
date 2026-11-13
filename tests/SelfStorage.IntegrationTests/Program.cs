@@ -120,7 +120,7 @@ try
         sql.Open();
         using var schema = new SqlCommand(File.ReadAllText(Path.Combine(AppContext.BaseDirectory, "Schema.sql")), sql);
         schema.ExecuteNonQuery();
-        using var insert = new SqlCommand("INSERT dbo.Users VALUES (7, N'Existing SQL user', N'existing@example.com', 'hash', 'Customer')", sql);
+        using var insert = new SqlCommand("INSERT dbo.Users (Id, FullName, Email, PasswordHash, Role) VALUES (7, N'Existing SQL user', N'existing@example.com', 'hash', 'Customer')", sql);
         insert.ExecuteNonQuery();
     }
     Check(DataStore.Open(provisionedConnection).Users.Single().Id == 7, "pre-provisioned SQL data is not replaced by demo seed");

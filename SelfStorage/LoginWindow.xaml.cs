@@ -17,6 +17,7 @@ public partial class LoginWindow : Window
         var user = _db.Users.FirstOrDefault(u => u.Email.Equals(email, StringComparison.OrdinalIgnoreCase) && u.PasswordHash == hash);
 
         if (user == null) { lblMsg.Text = "Sai email hoặc mật khẩu."; return; }
+        if (!user.IsActive) { lblMsg.Text = "Tài khoản đã bị khóa. Hãy liên hệ quản trị viên."; return; }
         _db.CurrentUser = user;
         Window next = user.Role == "Admin" ? new AdminWindow() : new MainWindow();
         next.Show();

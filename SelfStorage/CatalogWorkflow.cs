@@ -27,13 +27,21 @@ public partial class DataStore
             throw new StoreConcurrencyException("Kho đã được chỉnh sửa ở phiên khác. Hãy mở lại cửa sổ sửa.");
         if (db.Units.Any(u => u.Id != current?.Id && u.FacilityId == draft.FacilityId && u.Code.Equals(draft.Code.Trim(), StringComparison.OrdinalIgnoreCase)))
             throw new InvalidOperationException("Mã kho đã tồn tại trong cơ sở này.");
-        if (current != null && db.Rentals.Any(r => r.UnitId == current.Id && !r.IsReturned) &&
+        if (current != null && db.Rentals.Any(r => r.UnitId == current.Id && r.IsOpen) &&
             (draft.FacilityId != current.FacilityId || draft.IsAvailable != current.IsAvailable))
             throw new InvalidOperationException("Kho còn đơn chưa hoàn tất: không được chuyển cơ sở hoặc đổi trạng thái.");
         var target = current ?? new StorageUnit { Id = db.Units.Count == 0 ? 1 : db.Units.Max(u => u.Id) + 1 };
         target.FacilityId = draft.FacilityId; target.Code = draft.Code.Trim(); target.Type = draft.Type.Trim();
         target.SizeM2 = draft.SizeM2; target.PricePerMonth = draft.PricePerMonth; target.IsAvailable = draft.IsAvailable;
         if (current == null) db.Units.Add(target);
+    });
+
+    public void SetCustomerActive(int id, bool active) => Change(db =>
+    {
+        db.RequireAdmin();
+        var user = db.Users.SingleOrDefault(u => u.Id == id && u.Role == "Customer")
+            ?? throw new InvalidOperationException("Không tìm thấy tài khoản khách hàng.");
+        user.IsActive = active;
     });
 
     public void SaveFacility(Facility draft, Facility? original) => Change(db =>

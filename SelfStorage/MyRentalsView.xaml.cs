@@ -15,9 +15,38 @@ public partial class MyRentalsView : UserControl
 
     public void Reload()
     {
-        UiActions.Try(_db.Reload);
+        if (!UiActions.Try(_db.Reload)) return;
+        ShowRentals();
+    }
+
+    internal void ShowRentals()
+    {
+        var selectedId = (grid.SelectedItem as Rental)?.Id;
         var uid = _db.CurrentUser?.Id ?? -1;
-        grid.ItemsSource = _db.Rentals.Where(r => r.UserId == uid).OrderByDescending(r => r.Id).ToList();
+        var rentals = _db.Rentals.Where(r => r.UserId == uid).OrderByDescending(r => r.Id).ToList();
+        grid.ItemsSource = rentals;
+        grid.SelectedItem = rentals.FirstOrDefault(r => r.Id == selectedId);
+    }
+
+    void PayHold_Click(object sender, RoutedEventArgs e)
+    {
+        if (grid.SelectedItem is not Rental selected || !UiActions.Try(_db.Reload)) return;
+        var rental = _db.Rentals.SingleOrDefault(r => r.Id == selected.Id && r.UserId == _db.CurrentUser?.Id);
+        if (rental?.IsAwaitingPayment != true) { ShowRentals(); return; }
+        var owner = Window.GetWindow(this);
+        var payment = new PaymentWindow(rental, _db) { Owner = owner };
+        if (payment.ShowDialog() == true && payment.PaidRental is Rental paid)
+            new QrWindow(paid) { Owner = owner }.ShowDialog();
+        Reload();
+    }
+
+    void CancelHold_Click(object sender, RoutedEventArgs e)
+    {
+        if (grid.SelectedItem is not Rental rental || !rental.IsAwaitingPayment) return;
+        if (MessageBox.Show($"Hủy giữ chỗ kho {rental.UnitCode}?", "Hủy giữ chỗ",
+            MessageBoxButton.YesNo, MessageBoxImage.Question) != MessageBoxResult.Yes) return;
+        UiActions.Try(() => _db.CancelHold(rental.Id));
+        ShowRentals();
     }
 
     void Qr_Click(object sender, RoutedEventArgs e)
@@ -25,7 +54,8 @@ public partial class MyRentalsView : UserControl
         if (grid.SelectedItem is not Rental r) { MessageBox.Show("Hãy chọn một đơn thuê."); return; }
         if (!UiActions.Try(_db.Reload)) return;
         r = _db.Rentals.FirstOrDefault(x => x.Id == r.Id && x.UserId == _db.CurrentUser?.Id)!;
-        if (r == null || r.IsReturned) { MessageBox.Show("Đơn không còn hiệu lực."); Reload(); return; }
+        if (r == null || r.PaidAt == null || !r.IsOpen || r.QrContent == "")
+        { MessageBox.Show("Đơn hiện không có QR nhận/trả kho."); ShowRentals(); return; }
         new QrWindow(r) { Owner = Window.GetWindow(this) }.ShowDialog();
     }
 
@@ -47,11 +77,17 @@ public partial class MyRentalsView : UserControl
 
     void Rental_Changed(object sender, SelectionChangedEventArgs e)
     {
-        if (lblDetails == null) return;
-        lblDetails.Text = grid.SelectedItem is Rental r
-            ? $"Nhận kho: {r.ReceivedAt:dd/MM/yyyy HH:mm} • Yêu cầu trả: {r.ReturnRequestedAt:dd/MM/yyyy HH:mm}\n" +
-              $"Cọc: {r.Deposit:N2} ₫ • Khấu trừ: {r.Deduction:N2} ₫ • {r.RefundText}\n" +
+        var r = grid.SelectedItem as Rental;
+        btnPayHold.IsEnabled = btnCancelHold.IsEnabled = r?.IsAwaitingPayment == true;
+        btnQr.IsEnabled = r is { IsOpen: true, PaidAt: not null } && r.QrContent != "";
+        btnReturn.IsEnabled = r is { IsOpen: true, PaidAt: not null, ReturnRequestedAt: null } &&
+            (r.ReceivedAt != null || r.IsLegacyRental);
+        lblDetails.Text = r == null ? "Chọn đơn để xem chi tiết."
+            : r.IsAwaitingPayment ? $"Giữ kho đến {r.HoldDeadlineLocal:HH:mm:ss dd/MM/yyyy} • Tổng cần thanh toán: {r.Total:N2} ₫"
+            : r.PaidAt == null ? r.StatusText
+            : $"Nhận kho: {r.ReceivedAt:dd/MM/yyyy HH:mm} • Yêu cầu trả: {r.ReturnRequestedAt:dd/MM/yyyy HH:mm}\n" +
+              $"Cọc: {r.Deposit:N2} ₫ • Phí phát sinh: {r.ExtraFee:N2} ₫ • Khấu trừ: {r.Deduction:N2} ₫ • {r.RefundText}\n" +
               $"Biên bản: {r.InspectionNotes}\nMã đối soát: {r.RefundReference} • Lúc: {r.RefundedAt:dd/MM/yyyy HH:mm}"
-            : "Chọn đơn để xem bàn giao và đối soát cọc.";
+            + (r.ExtraFee > r.Deduction ? $"\nPhí vượt cọc: {r.ExtraFee - r.Deduction:N2} ₫" : "");
     }
 }

@@ -12,8 +12,8 @@
             </DockPanel>
         </Border>
         <TabControl x:Name="Tabs" Style="{StaticResource WorkspaceTabs}" Tag="Khách hàng" SelectionChanged="Tabs_SelectionChanged">
-            <TabItem Header="Tìm kho"><local:BrowseView x:Name="browse"/></TabItem>
-            <TabItem Header="Kho của tôi"><local:MyRentalsView x:Name="mine"/></TabItem>
+            <TabItem Header="Tìm kho" Tag="{StaticResource BrowseIcon}"><local:BrowseView x:Name="browse"/></TabItem>
+            <TabItem Header="Kho của tôi" Tag="{StaticResource UnitIcon}"><local:MyRentalsView x:Name="mine"/></TabItem>
         </TabControl>
     </DockPanel>
 </Window>

@@ -69,11 +69,20 @@ internal static class WpfChecks
                     Check(locationFilter.Items.Cast<Facility>().Any(f => f.Name == "Cơ sở từ máy khác"), "admin refresh reads external location data");
                     Check(Field<DataGrid>(adminWindow, "gridCustomers").Items.Cast<User>().All(u => u.Role == "Customer"),
                         "admin customer grid excludes administrators");
+                    Check(!Field<Button>(adminWindow, "btnReceive").IsEnabled &&
+                        Field<TextBlock>(adminWindow, "lblEmptyRentals").Visibility == Visibility.Visible,
+                        "empty admin rental table explains its state and disables pickup");
                     adminWindow.Close();
 
                     db.CurrentUser = db.Users.Single(u => u.Id == 2);
                     var rental = WorkflowChecks.BookPaid(db, 1, DateTime.Today, 1, 123456.78m, "Thẻ ngân hàng");
                     db.CurrentUser = db.Users.Single(u => u.Id == 1);
+                    var rentalList = new AdminWindow();
+                    var adminRentals = Field<DataGrid>(rentalList, "gridRentals");
+                    adminRentals.SelectedItem = adminRentals.Items.Cast<Rental>().Single(r => r.Id == rental.Id);
+                    Check(Field<Button>(rentalList, "btnReceive").IsEnabled && !Field<Button>(rentalList, "btnRefund").IsEnabled,
+                        "selected paid rental enables pickup and keeps settlement unavailable");
+                    rentalList.Close();
                     var pickup = new RentalOperationsWindow(rental.Id, RentalOperation.Receive);
                     Check(Dialog(pickup, () => { Field<TextBox>(pickup, "txtQr").Text = rental.QrContent; Click(pickup, "Confirm_Click"); }) == true,
                         "WPF admin pickup form confirms valid QR");
@@ -111,6 +120,14 @@ internal static class WpfChecks
                     var visibleUnits = Field<DataGrid>(browse, "grid").Items.Cast<StorageUnit>().ToList();
                     Check(visibleUnits.Count > 0 && visibleUnits.All(u => u.SizeM2 >= 5 && u.PricePerMonth <= 700000),
                         "customer combines size and price filters");
+                    Field<TextBox>(browse, "txtMinArea").Text = "99999";
+                    Click(browse, "Filter_Changed");
+                    Check(Field<Border>(browse, "emptyResults").Visibility == Visibility.Visible && !Field<Button>(browse, "btnBook").IsEnabled,
+                        "customer sees empty search guidance without an available booking action");
+                    Click(browse, "ResetFilters_Click");
+                    Check(Field<Border>(browse, "emptyResults").Visibility == Visibility.Collapsed &&
+                        Field<TextBox>(browse, "txtMinArea").Text == "" && Field<TextBox>(browse, "txtMaxPrice").Text == "",
+                        "reset filters clears the inputs and restores search results");
                     var customerWindow = new MainWindow();
                     customerWindow.Close();
                     Check(unhandled.Count == 0, "customer and admin WPF views initialize without errors");

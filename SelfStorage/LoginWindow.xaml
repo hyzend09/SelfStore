@@ -8,30 +8,39 @@
         <Border Background="{StaticResource Nav}" Padding="32">
             <DockPanel>
                 <StackPanel DockPanel.Dock="Top" Orientation="Horizontal">
-                    <Border Background="{StaticResource Mint}" Width="40" Height="40" CornerRadius="9">
+                    <Border Background="{StaticResource Mint}" Width="40" Height="40" CornerRadius="10">
                         <Path Width="22" Height="22" Stretch="Uniform" Stroke="{StaticResource Nav}" StrokeThickness="1.8"
-                              Data="M1,7 L11,1 21,7 21,17 11,23 1,17 Z M1,7 L11,13 21,7 M11,13 L11,23 M6,4 L16,10"/>
+                              Data="{StaticResource BrandMark}"/>
                     </Border>
                     <TextBlock Text="SelfStore" Foreground="White" FontSize="22" FontWeight="SemiBold"
                                VerticalAlignment="Center" Margin="10,0,0,0"/>
                 </StackPanel>
-                <StackPanel DockPanel.Dock="Bottom">
-                    <TextBlock Text="Tài khoản demo" Foreground="{StaticResource Mint}" FontWeight="SemiBold"/>
-                    <TextBlock Text="Khách: demo@demo.com / 123456" Foreground="{StaticResource NavText}" Margin="0,6,0,0" TextWrapping="Wrap"/>
-                    <TextBlock Text="Admin: admin@demo.com / admin123" Foreground="{StaticResource NavText}" Margin="0,3,0,0" TextWrapping="Wrap"/>
-                </StackPanel>
+                <Border DockPanel.Dock="Bottom" BorderBrush="{StaticResource NavLine}" BorderThickness="0,1,0,0" Padding="0,14,0,0">
+                    <StackPanel>
+                        <TextBlock Text="Tài khoản demo" Foreground="{StaticResource Mint}" FontWeight="SemiBold"/>
+                        <TextBlock Text="Khách · demo@demo.com / 123456" Foreground="{StaticResource NavText}" Margin="0,6,0,0" TextWrapping="Wrap" FontSize="13"/>
+                        <TextBlock Text="Admin · admin@demo.com / admin123" Foreground="{StaticResource NavText}" Margin="0,3,0,0" TextWrapping="Wrap" FontSize="13"/>
+                    </StackPanel>
+                </Border>
                 <StackPanel VerticalAlignment="Center">
-                    <Path Width="82" Height="82" HorizontalAlignment="Left" Stretch="Uniform" Stroke="{StaticResource Mint}"
-                          StrokeThickness="1.5" Data="M1,7 L11,1 21,7 21,17 11,23 1,17 Z M1,7 L11,13 21,7 M11,13 L11,23 M6,4 L16,10"/>
-                    <TextBlock Style="{StaticResource TitleText}" Foreground="White" FontSize="37" Margin="0,18,0,0">
+                    <Viewbox Width="204" Height="102" HorizontalAlignment="Left" Stretch="Uniform">
+                        <Canvas Width="204" Height="102" IsHitTestVisible="False">
+                            <Path Stroke="{StaticResource NavLine}" StrokeThickness="1" Data="M4,91 H201 M21,97 H176 M46,11 V91 M95,11 V91 M144,11 V91 M193,11 V91 M5,26 H201 M5,48 H201 M5,69 H201"/>
+                            <Path Stroke="{StaticResource Mint}" Fill="{StaticResource Nav}" StrokeThickness="1.5" StrokeLineJoin="Round"
+                                  Data="M18,53 L47,37 111,37 139,53 139,90 18,90 Z M18,53 H139 M45,90 V61 H112 V90 M45,68 H112 M45,75 H112 M45,82 H112"/>
+                            <Path Stroke="{StaticResource Mint}" Fill="{StaticResource NavHover}" StrokeThickness="1.5" StrokeLineJoin="Round"
+                                  Data="M127,69 L150,57 177,69 177,88 150,100 127,88 Z M127,69 L150,81 177,69 M150,81 V100 M138,63 L163,75"/>
+                        </Canvas>
+                    </Viewbox>
+                    <TextBlock Style="{StaticResource TitleText}" Foreground="White" FontSize="38" Margin="0,16,0,0">
                         <Run Text="Thuê kho"/><LineBreak/><Run Text="tự phục vụ"/>
                     </TextBlock>
-                    <TextBlock Text="Tìm kho, đặt chỗ và theo dõi đơn thuê." Foreground="{StaticResource NavText}" TextWrapping="Wrap" Margin="0,10,0,0"/>
+                    <TextBlock Text="Tìm kho theo nhu cầu, đặt chỗ và theo dõi đơn thuê từ lúc nhận đến khi trả." Foreground="{StaticResource NavText}" TextWrapping="Wrap" Margin="0,12,0,0"/>
                 </StackPanel>
             </DockPanel>
         </Border>
         <ScrollViewer Grid.Column="1" Background="{StaticResource Surface}" VerticalScrollBarVisibility="Auto">
-            <StackPanel Width="335" HorizontalAlignment="Center" Margin="22,46,22,26">
+            <StackPanel MaxWidth="380" Margin="30,48,30,26">
                 <TextBlock Text="Tài khoản SelfStore" Style="{StaticResource TitleText}" Margin="0,0,0,20"/>
                 <TabControl x:Name="AccountTabs" Style="{StaticResource FormTabs}">
                     <TabItem Header="Đăng nhập">

@@ -11,47 +11,59 @@
             </DockPanel>
         </Border>
         <TabControl x:Name="Workspace" Style="{StaticResource WorkspaceTabs}" Tag="Quản trị">
-            <TabItem Header="Tổng quan">
+            <TabItem Header="Tổng quan" Tag="{StaticResource OverviewIcon}">
                 <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
                   <StackPanel>
-                    <TextBlock Text="Tổng quan" Style="{StaticResource TitleText}"/>
-                    <TextBlock Text="Tình trạng kho hiện tại và phí thuê đã thu." Style="{StaticResource MutedText}" Margin="0,4,0,18"/>
-                    <UniformGrid Columns="3">
-                        <Border Style="{StaticResource Card}" Margin="0,0,10,0">
+                    <DockPanel Margin="0,0,0,18">
+                        <Button DockPanel.Dock="Right" Content="Làm mới" Click="Refresh_Click" Margin="12,0,0,0" VerticalAlignment="Center"/>
+                        <StackPanel>
+                            <TextBlock Text="Tổng quan" Style="{StaticResource TitleText}"/>
+                            <TextBlock Text="Tình trạng kho và các đơn cần xử lý." Style="{StaticResource MutedText}" Margin="0,4,0,0"/>
+                        </StackPanel>
+                    </DockPanel>
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="1*"/>
+                            <ColumnDefinition Width="1*"/>
+                            <ColumnDefinition Width="2*"/>
+                        </Grid.ColumnDefinitions>
+                        <Border Style="{StaticResource Card}" Margin="0,0,12,0" Background="{StaticResource AccentSoft}">
                             <StackPanel>
+                                <Path Data="{StaticResource UnitIcon}" Width="20" Height="20" Stretch="Uniform" Stroke="{StaticResource Accent}"
+                                      StrokeThickness="1.6" HorizontalAlignment="Left" Margin="0,0,0,10"/>
                                 <TextBlock Text="Kho còn trống" Style="{StaticResource MutedText}"/>
                                 <TextBlock x:Name="lblAvailable" Style="{StaticResource MetricValue}" Foreground="{StaticResource Accent}"/>
                             </StackPanel>
                         </Border>
-                        <Border Style="{StaticResource Card}" Margin="0,0,10,0">
+                        <Border Grid.Column="1" Style="{StaticResource Card}" Margin="0,0,12,0">
                             <StackPanel>
+                                <Path Data="{StaticResource UnitIcon}" Width="20" Height="20" Stretch="Uniform" Stroke="{StaticResource Info}"
+                                      StrokeThickness="1.6" HorizontalAlignment="Left" Margin="0,0,0,10"/>
                                 <TextBlock Text="Kho đang thuê" Style="{StaticResource MutedText}"/>
                                 <TextBlock x:Name="lblRented" Style="{StaticResource MetricValue}"/>
                             </StackPanel>
                         </Border>
-                        <Border Style="{StaticResource Card}">
-                            <StackPanel>
-                                <TextBlock Text="Phí thuê đã thu" Style="{StaticResource MutedText}"/>
+                        <Border Grid.Column="2" Style="{StaticResource Card}">
+                            <DockPanel>
+                                <StackPanel DockPanel.Dock="Top" Margin="0,0,0,8">
+                                    <TextBlock Text="Phí thuê đã thu" Style="{StaticResource MutedText}"/>
+                                    <TextBlock x:Name="lblRevenuePeriod" Style="{StaticResource MutedText}" FontSize="12" Margin="0,2,0,0"/>
+                                </StackPanel>
+                                <StackPanel DockPanel.Dock="Bottom" Margin="0,12,0,0">
+                                    <Label Content="Chọn ngày trong tháng cần xem" Target="{Binding ElementName=dpRevenueMonth}" Style="{StaticResource FieldLabel}"/>
+                                    <DatePicker x:Name="dpRevenueMonth" Width="150" HorizontalAlignment="Left" SelectedDateChanged="RevenueMonth_Changed"/>
+                                </StackPanel>
                                 <TextBlock x:Name="lblStats" Style="{StaticResource MetricValue}" TextWrapping="Wrap"/>
-                                <TextBlock x:Name="lblRevenuePeriod" Style="{StaticResource MutedText}" Margin="0,5,0,0"/>
-                            </StackPanel>
+                            </DockPanel>
                         </Border>
-                    </UniformGrid>
-                    <Border Style="{StaticResource Card}" Margin="0,16,0,0">
-                        <DockPanel>
-                            <Button DockPanel.Dock="Right" Content="Làm mới" Click="Refresh_Click" Margin="14,0,0,0" VerticalAlignment="Center"/>
-                            <StackPanel>
-                                <Label Content="Chọn một ngày trong tháng thống kê" Target="{Binding ElementName=dpRevenueMonth}" Style="{StaticResource FieldLabel}"/>
-                                <DatePicker x:Name="dpRevenueMonth" Width="160" HorizontalAlignment="Left" SelectedDateChanged="RevenueMonth_Changed"/>
-                            </StackPanel>
-                        </DockPanel>
-                    </Border>
+                    </Grid>
                     <Border Style="{StaticResource Card}" Margin="0,16,0,0">
                         <StackPanel>
                             <DockPanel Margin="0,0,0,14">
                                 <Button DockPanel.Dock="Right" Content="Mở danh sách đơn" Click="OpenRentals_Click" Margin="12,0,0,0" VerticalAlignment="Center"/>
                                 <TextBlock Text="Đơn cần xử lý" Style="{StaticResource SectionTitle}" VerticalAlignment="Center"/>
                             </DockPanel>
+                            <Separator Margin="0,0,0,12"/>
                             <UniformGrid Columns="4">
                                 <StackPanel Margin="0,0,8,0">
                                     <TextBlock Text="Chờ nhận kho" Style="{StaticResource MutedText}"/>
@@ -59,7 +71,7 @@
                                 </StackPanel>
                                 <StackPanel Margin="0,0,8,0">
                                     <TextBlock Text="Quá hạn nhận" Style="{StaticResource MutedText}"/>
-                                    <TextBlock x:Name="lblMissed" Style="{StaticResource MetricValue}"/>
+                                    <TextBlock x:Name="lblMissed" Style="{StaticResource MetricValue}" Foreground="{StaticResource Danger}"/>
                                 </StackPanel>
                                 <StackPanel Margin="0,0,8,0">
                                     <TextBlock Text="Chờ kiểm tra" Style="{StaticResource MutedText}"/>
@@ -77,60 +89,67 @@
             </TabItem>
 
             <!-- ===== KHO ===== -->
-            <TabItem Header="Quản lý kho">
+            <TabItem Header="Quản lý kho" Tag="{StaticResource UnitIcon}">
                 <DockPanel>
                     <StackPanel DockPanel.Dock="Top" Margin="0,0,0,15">
                         <TextBlock Text="Quản lý kho" Style="{StaticResource TitleText}"/>
                         <TextBlock Text="Xem tình trạng, cập nhật thông tin và giá thuê của từng kho." Style="{StaticResource MutedText}" Margin="0,4,0,0"/>
                     </StackPanel>
                     <WrapPanel DockPanel.Dock="Top" Margin="0,0,0,12">
-                        <TextBlock Text="Vị trí" VerticalAlignment="Center"/>
-                        <ComboBox x:Name="cbFilter" Width="200" Margin="6,0,16,0" DisplayMemberPath="Name"
+                        <Label Content="Vị trí" Target="{Binding ElementName=cbFilter}" VerticalAlignment="Center"/>
+                        <ComboBox x:Name="cbFilter" Width="185" Margin="0,0,16,0" DisplayMemberPath="Name"
                                   SelectionChanged="Filter_Changed"/>
                         <Button Content="Thêm kho" Style="{StaticResource PrimaryButton}" Click="AddUnit_Click"/>
                         <Button Content="Làm mới" Click="Refresh_Click"/>
-                        <Button Content="Sửa kho" Click="EditUnit_Click"/>
-                        <Button Content="Xóa kho" Style="{StaticResource DangerButton}" Click="DeleteUnit_Click"/>
+                        <Button x:Name="btnEditUnit" Content="Sửa kho" Click="EditUnit_Click" IsEnabled="False"/>
+                        <Button x:Name="btnDeleteUnit" Content="Xóa kho" Style="{StaticResource DangerButton}" Click="DeleteUnit_Click" IsEnabled="False"/>
                     </WrapPanel>
-                    <DataGrid x:Name="gridUnits" AutoGenerateColumns="False" IsReadOnly="True"
+                    <Grid>
+                      <DataGrid x:Name="gridUnits" AutoGenerateColumns="False" IsReadOnly="True"
                               SelectionMode="Single" CanUserAddRows="False" HeadersVisibility="Column"
-                              MouseDoubleClick="EditUnit_Click">
+                              MouseDoubleClick="EditUnit_Click" SelectionChanged="UnitSelection_Changed" AutomationProperties.Name="Danh sách kho">
                         <DataGrid.Columns>
                             <DataGridTextColumn Header="ID" Binding="{Binding Id}" Width="50" ElementStyle="{StaticResource TableText}"/>
                             <DataGridTextColumn Header="Vị trí" Binding="{Binding FacilityName}" Width="*" MinWidth="125" ElementStyle="{StaticResource TableText}"/>
                             <DataGridTextColumn Header="Mã kho" Binding="{Binding Code}" Width="100" ElementStyle="{StaticResource TableText}"/>
                             <DataGridTextColumn Header="Loại" Binding="{Binding Type}" Width="110" ElementStyle="{StaticResource TableText}"/>
                             <DataGridTextColumn Header="Diện tích (m²)" Binding="{Binding SizeM2}" Width="110" ElementStyle="{StaticResource TableText}"/>
-                            <DataGridTextColumn Header="Giá / tháng" Binding="{Binding PricePerMonth, StringFormat={}{0:N2} ₫}" Width="140" ElementStyle="{StaticResource TableText}"/>
+                            <DataGridTextColumn Header="Giá / tháng" Binding="{Binding PricePerMonth, StringFormat={}{0:N2} ₫}" Width="140" ElementStyle="{StaticResource TableAmount}"/>
                             <DataGridTemplateColumn Header="Trạng thái" Width="165" SortMemberPath="StatusText" CellTemplate="{StaticResource StatusCell}"/>
                         </DataGrid.Columns>
-                    </DataGrid>
+                      </DataGrid>
+                      <TextBlock x:Name="lblEmptyUnits" Text="Vị trí này chưa có kho." Style="{StaticResource EmptyTableText}"/>
+                    </Grid>
                 </DockPanel>
             </TabItem>
 
-            <TabItem Header="Khách hàng">
+            <TabItem Header="Khách hàng" Tag="{StaticResource CustomersIcon}">
                 <DockPanel>
                     <StackPanel DockPanel.Dock="Top" Margin="0,0,0,15">
                         <TextBlock Text="Khách hàng" Style="{StaticResource TitleText}"/>
                         <TextBlock Text="Xem trạng thái và quản lý quyền truy cập của khách thuê." Style="{StaticResource MutedText}" Margin="0,4,0,0"/>
                     </StackPanel>
                     <WrapPanel DockPanel.Dock="Top" Margin="0,0,0,12">
-                        <Button Content="Khóa hoặc mở khóa" Click="ToggleCustomer_Click"/>
+                        <Button x:Name="btnToggleCustomer" Content="Khóa hoặc mở khóa" Click="ToggleCustomer_Click" IsEnabled="False"/>
                         <Button Content="Làm mới" Click="Refresh_Click"/>
                     </WrapPanel>
-                    <DataGrid x:Name="gridCustomers" AutoGenerateColumns="False" IsReadOnly="True"
-                              SelectionMode="Single" CanUserAddRows="False" HeadersVisibility="Column">
+                    <Grid>
+                      <DataGrid x:Name="gridCustomers" AutoGenerateColumns="False" IsReadOnly="True"
+                              SelectionMode="Single" CanUserAddRows="False" HeadersVisibility="Column"
+                              SelectionChanged="CustomerSelection_Changed" AutomationProperties.Name="Danh sách khách hàng">
                         <DataGrid.Columns>
                             <DataGridTextColumn Header="Họ tên" Binding="{Binding FullName}" Width="*" ElementStyle="{StaticResource TableText}"/>
                             <DataGridTextColumn Header="Email" Binding="{Binding Email}" Width="*" ElementStyle="{StaticResource TableText}"/>
                             <DataGridTemplateColumn Header="Trạng thái" Width="150" SortMemberPath="AccountStatus" CellTemplate="{StaticResource AccountStatusCell}"/>
                         </DataGrid.Columns>
-                    </DataGrid>
+                      </DataGrid>
+                      <TextBlock x:Name="lblEmptyCustomers" Text="Chưa có khách hàng đăng ký." Style="{StaticResource EmptyTableText}"/>
+                    </Grid>
                 </DockPanel>
             </TabItem>
 
             <!-- ===== ĐƠN THUÊ ===== -->
-            <TabItem x:Name="RentalsTab" Header="Đơn thuê">
+            <TabItem x:Name="RentalsTab" Header="Đơn thuê" Tag="{StaticResource RentalsIcon}">
                 <DockPanel>
                     <StackPanel DockPanel.Dock="Top" Margin="0,0,0,15">
                         <TextBlock Text="Đơn thuê" Style="{StaticResource TitleText}"/>
@@ -138,18 +157,23 @@
                     </StackPanel>
                     <WrapPanel DockPanel.Dock="Top" Margin="0,0,0,12">
                         <Button Content="Làm mới" Click="Refresh_Click"/>
-                        <Button Content="Bàn giao bằng QR" Style="{StaticResource PrimaryButton}" Click="Receive_Click"/>
-                        <Button Content="Kiểm tra trả kho" Click="Inspect_Click"/>
-                        <Button Content="Xử lý đơn ngoại lệ" Click="StartReturn_Click"/>
-                        <Button Content="Xác nhận hoàn cọc" Click="Refund_Click"/>
+                        <Button x:Name="btnReceive" Content="Bàn giao bằng QR" Style="{StaticResource PrimaryButton}" Click="Receive_Click" IsEnabled="False"/>
+                        <Button x:Name="btnInspect" Content="Kiểm tra trả kho" Click="Inspect_Click" IsEnabled="False"/>
+                        <Button x:Name="btnStartReturn" Content="Xử lý đơn ngoại lệ" Click="StartReturn_Click" IsEnabled="False"/>
+                        <Button x:Name="btnRefund" Content="Xác nhận hoàn cọc" Click="Refund_Click" IsEnabled="False"/>
                     </WrapPanel>
-                    <DataGrid x:Name="gridRentals" AutoGenerateColumns="False" IsReadOnly="True"
-                              CanUserAddRows="False" HeadersVisibility="Column">
+                    <TextBlock x:Name="lblRentalAction" DockPanel.Dock="Bottom" Style="{StaticResource MutedText}"
+                               Text="Chọn một đơn để xem thao tác khả dụng." Margin="0,8,0,0" AutomationProperties.LiveSetting="Polite"/>
+                    <Grid>
+                      <DataGrid x:Name="gridRentals" AutoGenerateColumns="False" IsReadOnly="True"
+                              CanUserAddRows="False" HeadersVisibility="Column" SelectionChanged="RentalSelection_Changed"
+                              AutomationProperties.Name="Danh sách đơn thuê">
                         <DataGrid.Columns>
                             <DataGridTextColumn Header="Mã" Binding="{Binding Id}" Width="50" ElementStyle="{StaticResource TableText}"/>
                             <DataGridTextColumn Header="Khách hàng" Binding="{Binding CustomerName}" Width="*" MinWidth="125" ElementStyle="{StaticResource TableText}"/>
-                            <DataGridTextColumn Header="Vị trí" Binding="{Binding FacilityName}" Width="120" ElementStyle="{StaticResource TableText}"/>
                             <DataGridTextColumn Header="Kho" Binding="{Binding UnitCode}" Width="72" ElementStyle="{StaticResource TableText}"/>
+                            <DataGridTemplateColumn Header="Trạng thái" Width="165" MinWidth="155" SortMemberPath="StatusText" CellTemplate="{StaticResource StatusCell}"/>
+                            <DataGridTextColumn Header="Vị trí" Binding="{Binding FacilityName}" Width="120" ElementStyle="{StaticResource TableText}"/>
                             <DataGridTextColumn Header="Bắt đầu" Binding="{Binding StartDate, StringFormat=dd/MM/yyyy}" Width="106" ElementStyle="{StaticResource TableText}"/>
                             <DataGridTextColumn Header="Kết thúc" Binding="{Binding EndDate, StringFormat=dd/MM/yyyy}" Width="106" ElementStyle="{StaticResource TableText}"/>
                             <DataGridTemplateColumn Header="Thanh toán" Width="128" SortMemberPath="PaidAmount">
@@ -162,10 +186,11 @@
                                     </DataTemplate>
                                 </DataGridTemplateColumn.CellTemplate>
                             </DataGridTemplateColumn>
-                            <DataGridTemplateColumn Header="Trạng thái" Width="165" SortMemberPath="StatusText" CellTemplate="{StaticResource StatusCell}"/>
                             <DataGridTextColumn Header="Đối soát cọc" Binding="{Binding RefundText}" Width="156" ElementStyle="{StaticResource TableText}"/>
                         </DataGrid.Columns>
-                    </DataGrid>
+                      </DataGrid>
+                      <TextBlock x:Name="lblEmptyRentals" Text="Chưa có đơn thuê." Style="{StaticResource EmptyTableText}"/>
+                    </Grid>
                 </DockPanel>
             </TabItem>
         </TabControl>

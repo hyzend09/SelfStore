@@ -56,9 +56,13 @@ public partial class AdminWindow : Window
 
     void LoadUnits()
     {
+        var id = (gridUnits.SelectedItem as StorageUnit)?.Id;
         IEnumerable<StorageUnit> q = _db.Units;
         if (cbFilter.SelectedItem is Facility f && f.Id != 0) q = q.Where(u => u.FacilityId == f.Id);
-        gridUnits.ItemsSource = q.OrderBy(u => u.FacilityId).ThenBy(u => u.Code).ToList();
+        var units = q.OrderBy(u => u.FacilityId).ThenBy(u => u.Code).ToList();
+        gridUnits.ItemsSource = units;
+        gridUnits.SelectedItem = units.FirstOrDefault(u => u.Id == id);
+        lblEmptyUnits.Visibility = units.Count == 0 ? Visibility.Visible : Visibility.Collapsed;
     }
 
     void LoadRentals()
@@ -67,6 +71,7 @@ public partial class AdminWindow : Window
         var rentals = _db.Rentals.OrderByDescending(r => r.Id).ToList();
         gridRentals.ItemsSource = rentals;
         gridRentals.SelectedItem = rentals.FirstOrDefault(r => r.Id == id);
+        lblEmptyRentals.Visibility = rentals.Count == 0 ? Visibility.Visible : Visibility.Collapsed;
     }
 
     void LoadCustomers()
@@ -75,6 +80,33 @@ public partial class AdminWindow : Window
         var customers = _db.Users.Where(u => u.Role == "Customer").OrderBy(u => u.FullName).ToList();
         gridCustomers.ItemsSource = customers;
         gridCustomers.SelectedItem = customers.FirstOrDefault(u => u.Id == id);
+        lblEmptyCustomers.Visibility = customers.Count == 0 ? Visibility.Visible : Visibility.Collapsed;
+    }
+
+    void UnitSelection_Changed(object sender, SelectionChangedEventArgs e) =>
+        btnEditUnit.IsEnabled = btnDeleteUnit.IsEnabled = gridUnits.SelectedItem is StorageUnit;
+
+    void CustomerSelection_Changed(object sender, SelectionChangedEventArgs e)
+    {
+        var customer = gridCustomers.SelectedItem as User;
+        btnToggleCustomer.IsEnabled = customer != null;
+        btnToggleCustomer.Content = customer == null ? "Khóa hoặc mở khóa"
+            : customer.IsActive ? "Khóa tài khoản" : "Mở khóa tài khoản";
+    }
+
+    void RentalSelection_Changed(object sender, SelectionChangedEventArgs e)
+    {
+        var rental = gridRentals.SelectedItem as Rental;
+        var today = DateTime.Today;
+        btnReceive.IsEnabled = rental is { IsOpen: true, PaidAt: not null, ReceivedAt: null, ReturnRequestedAt: null }
+            && !string.IsNullOrEmpty(rental.QrContent) && rental.StartDate.Date <= today && rental.EndDate.Date >= today;
+        btnInspect.IsEnabled = rental is { IsOpen: true, PaidAt: not null, ReturnRequestedAt: not null, InspectedAt: null };
+        btnStartReturn.IsEnabled = rental is { CanStartReturn: true } && (rental.MissedPickup || _db.IsCustomerLocked(rental));
+        btnRefund.IsEnabled = rental is { IsReturned: false, InspectedAt: not null, RefundedAt: null };
+        lblRentalAction.Text = rental == null ? "Chọn một đơn để xem thao tác khả dụng."
+            : btnReceive.IsEnabled || btnInspect.IsEnabled || btnStartReturn.IsEnabled || btnRefund.IsEnabled
+                ? $"Đơn #{rental.Id} · {rental.StatusText}"
+                : $"Đơn #{rental.Id} · {rental.StatusText} · Chưa có thao tác khả dụng";
     }
 
     void LoadStats()

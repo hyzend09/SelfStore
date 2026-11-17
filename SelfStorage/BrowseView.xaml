@@ -7,29 +7,38 @@
             <TextBlock Text="Chọn kho theo vị trí, diện tích và ngân sách." Style="{StaticResource MutedText}" Margin="0,4,0,16"/>
             <Border Style="{StaticResource Card}">
                 <StackPanel>
-                    <WrapPanel>
-                        <StackPanel Width="170" Margin="0,0,12,8">
+                    <Grid Margin="0,0,0,12">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="1.2*"/>
+                            <ColumnDefinition Width="1*"/>
+                            <ColumnDefinition Width="1*"/>
+                            <ColumnDefinition Width="1.15*"/>
+                        </Grid.ColumnDefinitions>
+                        <StackPanel Margin="0,0,12,0">
                             <Label Content="Vị trí" Target="{Binding ElementName=cbFacility}" Style="{StaticResource FieldLabel}"/>
                             <ComboBox x:Name="cbFacility" DisplayMemberPath="Name" SelectionChanged="Filter_Changed"/>
                         </StackPanel>
-                        <StackPanel Width="142" Margin="0,0,12,8">
+                        <StackPanel Grid.Column="1" Margin="0,0,12,0">
                             <Label Content="Loại kho" Target="{Binding ElementName=cbType}" Style="{StaticResource FieldLabel}"/>
                             <ComboBox x:Name="cbType" SelectionChanged="Filter_Changed"/>
                         </StackPanel>
-                        <StackPanel Width="132" Margin="0,0,12,8">
+                        <StackPanel Grid.Column="2" Margin="0,0,12,0">
                             <Label Content="Diện tích từ (m²)" Target="{Binding ElementName=txtMinArea}" Style="{StaticResource FieldLabel}"/>
                             <TextBox x:Name="txtMinArea"/>
                         </StackPanel>
-                        <StackPanel Width="156" Margin="0,0,0,8">
-                            <Label Content="Giá tối đa (₫/tháng)" Target="{Binding ElementName=txtMaxPrice}" Style="{StaticResource FieldLabel}"/>
+                        <StackPanel Grid.Column="3">
+                            <Label Content="Tối đa (₫/tháng)" Target="{Binding ElementName=txtMaxPrice}" Style="{StaticResource FieldLabel}"/>
                             <TextBox x:Name="txtMaxPrice"/>
                         </StackPanel>
-                    </WrapPanel>
-                    <WrapPanel Margin="0,5,0,0">
-                        <Button Content="Áp dụng bộ lọc" Click="Filter_Changed"/>
-                        <CheckBox x:Name="chkAvail" Content="Chỉ hiện kho còn trống" IsChecked="True" Margin="8,0,0,0"
+                    </Grid>
+                    <DockPanel>
+                        <StackPanel DockPanel.Dock="Right" Orientation="Horizontal">
+                            <Button Content="Xóa bộ lọc" Click="ResetFilters_Click"/>
+                            <Button Content="Áp dụng bộ lọc" Click="Filter_Changed" Margin="0" IsDefault="True"/>
+                        </StackPanel>
+                        <CheckBox x:Name="chkAvail" Content="Chỉ hiện kho còn trống" IsChecked="True"
                                   Checked="Filter_Changed" Unchecked="Filter_Changed"/>
-                    </WrapPanel>
+                    </DockPanel>
                     <TextBlock x:Name="lblFilterError" Foreground="{StaticResource Danger}" TextWrapping="Wrap" AutomationProperties.LiveSetting="Polite">
                         <TextBlock.Style>
                             <Style TargetType="TextBlock">
@@ -43,26 +52,34 @@
                 </StackPanel>
             </Border>
         </StackPanel>
-        <Border DockPanel.Dock="Bottom" Style="{StaticResource Card}" Padding="14,10" Margin="0,12,0,0">
+        <TextBlock x:Name="lblResults" DockPanel.Dock="Top" FontWeight="SemiBold" Margin="0,2,0,8"
+                   AutomationProperties.LiveSetting="Polite"/>
+        <Border DockPanel.Dock="Bottom" Style="{StaticResource Card}" Padding="14,10" Margin="0,12,0,0" Background="{StaticResource AccentSoft}">
             <DockPanel>
                 <Button x:Name="btnBook" DockPanel.Dock="Right" Content="Đặt kho đã chọn" Style="{StaticResource PrimaryButton}"
                         Margin="12,0,0,0" IsEnabled="False" Click="Book_Click"/>
                 <StackPanel VerticalAlignment="Center">
-                    <TextBlock x:Name="lblResults" FontWeight="SemiBold" AutomationProperties.LiveSetting="Polite"/>
-                    <TextBlock x:Name="lblSelectedUnit" Style="{StaticResource MutedText}" Text="Chọn một kho trong bảng để đặt."/>
+                    <TextBlock x:Name="lblSelectedUnit" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" Text="Chọn một kho trong bảng để đặt."/>
+                    <TextBlock x:Name="lblSelectedPrice" Style="{StaticResource MutedText}"/>
                 </StackPanel>
             </DockPanel>
         </Border>
-        <DataGrid x:Name="grid" AutoGenerateColumns="False" IsReadOnly="True" SelectionMode="Single"
+        <Grid>
+          <DataGrid x:Name="grid" AutoGenerateColumns="False" IsReadOnly="True" SelectionMode="Single"
                   CanUserAddRows="False" HeadersVisibility="Column" SelectionChanged="Unit_Changed" AutomationProperties.Name="Danh sách kho">
             <DataGrid.Columns>
                 <DataGridTextColumn Header="Mã kho" Binding="{Binding Code}" Width="92" ElementStyle="{StaticResource TableCode}"/>
                 <DataGridTextColumn Header="Vị trí" Binding="{Binding FacilityName}" Width="1.2*" MinWidth="115" ElementStyle="{StaticResource TableText}"/>
                 <DataGridTextColumn Header="Loại" Binding="{Binding Type}" Width="*" MinWidth="105" ElementStyle="{StaticResource TableText}"/>
                 <DataGridTextColumn Header="Diện tích" Binding="{Binding SizeM2, StringFormat={}{0:0.##} m²}" Width="95" ElementStyle="{StaticResource TableText}"/>
-                <DataGridTextColumn Header="Giá / tháng" Binding="{Binding PricePerMonth, StringFormat={}{0:N2} ₫}" Width="135" ElementStyle="{StaticResource TableText}"/>
+                <DataGridTextColumn Header="Giá / tháng" Binding="{Binding PricePerMonth, StringFormat={}{0:N2} ₫}" Width="135" ElementStyle="{StaticResource TableAmount}"/>
                 <DataGridTemplateColumn Header="Trạng thái" Width="105" SortMemberPath="StatusText" CellTemplate="{StaticResource StatusCell}"/>
             </DataGrid.Columns>
-        </DataGrid>
+          </DataGrid>
+          <Border x:Name="emptyResults" Visibility="Collapsed" Margin="16,52,16,12" IsHitTestVisible="False"
+                  HorizontalAlignment="Center" VerticalAlignment="Center">
+              <TextBlock Text="Thử đổi vị trí, diện tích hoặc mức giá." Style="{StaticResource MutedText}" TextAlignment="Center"/>
+          </Border>
+        </Grid>
     </DockPanel>
 </UserControl>

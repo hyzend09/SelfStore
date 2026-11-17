@@ -29,6 +29,18 @@ public partial class BrowseView : UserControl
 
     void Filter_Changed(object sender, RoutedEventArgs e) { if (_ready) LoadUnits(); }
 
+    void ResetFilters_Click(object sender, RoutedEventArgs e)
+    {
+        _ready = false;
+        cbFacility.SelectedIndex = cbType.SelectedIndex = 0;
+        txtMinArea.Clear();
+        txtMaxPrice.Clear();
+        chkAvail.IsChecked = true;
+        _ready = true;
+        LoadUnits();
+    }
+
+
     public void LoadUnits()
     {
         if (!_ready) return;
@@ -73,7 +85,9 @@ public partial class BrowseView : UserControl
         var units = lblFilterError.Text.Length == 0 ? q.OrderBy(u => u.FacilityId).ThenBy(u => u.PricePerMonth).ToList() : [];
         grid.ItemsSource = units;
         grid.SelectedItem = units.FirstOrDefault(u => u.Id == selectedId);
-        lblResults.Text = units.Count == 0 ? "Không tìm thấy kho phù hợp" : $"{units.Count:N0} kho phù hợp";
+        lblResults.Text = lblFilterError.Text.Length > 0 ? "Kiểm tra bộ lọc"
+            : units.Count == 0 ? "Không tìm thấy kho phù hợp" : $"{units.Count:N0} kho phù hợp";
+        emptyResults.Visibility = units.Count == 0 && lblFilterError.Text.Length == 0 ? Visibility.Visible : Visibility.Collapsed;
     }
 
     void Unit_Changed(object sender, SelectionChangedEventArgs e)
@@ -81,6 +95,8 @@ public partial class BrowseView : UserControl
         var unit = grid.SelectedItem as StorageUnit;
         btnBook.IsEnabled = unit?.IsAvailable == true;
         lblSelectedUnit.Text = unit == null ? "Chọn một kho trong bảng để đặt." : $"{unit.Code} · {unit.FacilityName} · {unit.StatusText}";
+        lblSelectedPrice.Text = unit == null ? "" : $"{unit.PricePerMonth:N2} ₫/tháng";
+        lblSelectedPrice.Visibility = unit == null ? Visibility.Collapsed : Visibility.Visible;
     }
 
     void Book_Click(object sender, RoutedEventArgs e)

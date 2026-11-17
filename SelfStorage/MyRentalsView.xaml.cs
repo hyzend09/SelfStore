@@ -26,6 +26,7 @@ public partial class MyRentalsView : UserControl
         var rentals = _db.Rentals.Where(r => r.UserId == uid).OrderByDescending(r => r.Id).ToList();
         grid.ItemsSource = rentals;
         grid.SelectedItem = rentals.FirstOrDefault(r => r.Id == selectedId);
+        emptyRentals.Visibility = rentals.Count == 0 ? Visibility.Visible : Visibility.Collapsed;
     }
 
     void PayHold_Click(object sender, RoutedEventArgs e)
@@ -81,13 +82,23 @@ public partial class MyRentalsView : UserControl
         btnPayHold.IsEnabled = btnCancelHold.IsEnabled = r?.IsAwaitingPayment == true;
         btnQr.IsEnabled = r is { IsOpen: true, PaidAt: not null } && r.QrContent != "";
         btnReturn.IsEnabled = r is { CanStartReturn: true, WasHandedOver: true };
+        rentalActions.Visibility = btnPayHold.IsEnabled || btnQr.IsEnabled || btnReturn.IsEnabled
+            ? Visibility.Visible : Visibility.Collapsed;
+        rentalDetails.Visibility = r == null ? Visibility.Collapsed : Visibility.Visible;
+        lblOrder.Text = r == null ? "" : $"Đơn #{r.Id} · Kho {r.UnitCode}";
+        lblStatus.Text = r?.StatusText ?? "";
+        detailStatus.Tag = r?.StatusText;
         lblDetails.Text = r == null ? "Chọn đơn để xem chi tiết."
-            : r.IsAwaitingPayment ? $"Giữ kho đến {r.HoldDeadlineLocal:HH:mm:ss dd/MM/yyyy} • Tổng cần thanh toán: {r.Total:N2} ₫"
+            : r.IsAwaitingPayment ? $"Giữ kho đến {r.HoldDeadlineLocal:HH:mm:ss dd/MM/yyyy}\nTổng cần thanh toán: {r.Total:N2} ₫"
             : r.PaidAt == null ? r.StatusText
-            : $"Nhận kho: {r.ReceivedAt:dd/MM/yyyy HH:mm} • Yêu cầu trả: {r.ReturnRequestedAt:dd/MM/yyyy HH:mm}\n" +
+            : $"Nhận kho: {FormatDate(r.ReceivedAt)} • Yêu cầu trả: {FormatDate(r.ReturnRequestedAt)}\n" +
               $"Cọc: {r.Deposit:N2} ₫ • Phí phát sinh: {r.ExtraFee:N2} ₫ • Khấu trừ: {r.Deduction:N2} ₫ • {r.RefundText}\n" +
-              $"Biên bản: {r.InspectionNotes}\nMã đối soát: {r.RefundReference} • Lúc: {r.RefundedAt:dd/MM/yyyy HH:mm}"
+              $"Biên bản: {DisplayValue(r.InspectionNotes)}\nMã đối soát: {DisplayValue(r.RefundReference)} • Lúc: {FormatDate(r.RefundedAt)}"
             + (r is { MissedPickup: true, CanStartReturn: true } ? "\nLiên hệ Admin để đối soát cọc cho đơn quá hạn nhận kho." : "")
             + (r.ExtraFee > r.Deduction ? $"\nPhí vượt cọc: {r.ExtraFee - r.Deduction:N2} ₫" : "");
     }
+
+    static string FormatDate(DateTime? date) => date?.ToString("dd/MM/yyyy HH:mm") ?? "—";
+
+    static string DisplayValue(string? value) => string.IsNullOrWhiteSpace(value) ? "—" : value;
 }

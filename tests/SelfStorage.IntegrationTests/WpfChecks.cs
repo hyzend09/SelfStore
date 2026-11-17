@@ -84,7 +84,18 @@ internal static class WpfChecks
                         "selected paid rental enables pickup and keeps settlement unavailable");
                     rentalList.Close();
                     var pickup = new RentalOperationsWindow(rental.Id, RentalOperation.Receive);
-                    Check(Dialog(pickup, () => { Field<TextBox>(pickup, "txtQr").Text = rental.QrContent; Click(pickup, "Confirm_Click"); }) == true,
+                    Check(Dialog(pickup, () =>
+                    {
+                        var qrInput = Field<TextBox>(pickup, "txtQr");
+                        var verified = Field<TextBlock>(pickup, "lblVerified");
+                        qrInput.Text = rental.QrContent;
+                        Click(pickup, "Verify_Click");
+                        Check(verified.Text.Contains("QR hợp lệ"), "pickup displays positive feedback for the verified code");
+                        qrInput.Text = "";
+                        Check(verified.Text == "", "editing the QR clears its previous verification feedback");
+                        qrInput.Text = rental.QrContent;
+                        Click(pickup, "Confirm_Click");
+                    }) == true,
                         "WPF admin pickup form confirms valid QR");
                     db.CurrentUser = db.Users.Single(u => u.Id == 2);
                     db.RequestReturn(rental.Id);
@@ -132,6 +143,13 @@ internal static class WpfChecks
                     customerWindow.Close();
                     Check(unhandled.Count == 0, "customer and admin WPF views initialize without errors");
                     var booking = new BookingWindow(db.Units.Single(u => u.Id == 2));
+                    var start = Field<DatePicker>(booking, "dpStart");
+                    var bookingTotal = Field<TextBlock>(booking, "lblTotal");
+                    start.SelectedDate = null;
+                    Check(bookingTotal.Text == "—", "clearing the booking date clears the previous price summary");
+                    start.SelectedDate = DateTime.Today;
+                    Check(bookingTotal.Text == $"{db.Units.Single(u => u.Id == 2).PricePerMonth * 2:N2} ₫",
+                        "valid booking date restores the itemized price summary");
                     Check(DriveBooking(booking, confirm: true) == true, "WPF booking flows through payment and QR");
                     var uiBooked = DataStore.Open(connection).Rentals.Single(r => r.UnitId == 2);
                     Check(uiBooked.ReceivedAt == null && uiBooked.StatusText == "Chờ nhận kho", "WPF booking persists pending pickup");

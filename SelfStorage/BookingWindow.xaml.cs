@@ -27,19 +27,35 @@ public partial class BookingWindow : Window
 
     void Recalc(object? sender, EventArgs e)
     {
-        if (cbMonths.SelectedItem is not int m || dpStart.SelectedDate is not DateTime start) return;
-        lblEnd.Text = $"Hạn thuê đến: {start.AddMonths(m):dd/MM/yyyy}";
-        lblRent.Text = $"Phí thuê ({m} tháng): {RentFee:N2} ₫";
-        lblDeposit.Text = $"Tiền cọc (hoàn lại khi trả kho): {Deposit:N2} ₫";
-        lblTotal.Text = $"Tổng thanh toán: {Deposit + RentFee:N2} ₫";
+        lblBookingError.Text = "";
+        if (cbMonths.SelectedItem is not int m || dpStart.SelectedDate is not DateTime start)
+        {
+            lblEnd.Text = lblRent.Text = lblDeposit.Text = lblTotal.Text = "—";
+            lblRentLabel.Text = "Phí thuê";
+            return;
+        }
+        lblEnd.Text = $"{start.AddMonths(m):dd/MM/yyyy}";
+        lblRentLabel.Text = $"Phí thuê ({m} tháng)";
+        lblRent.Text = $"{RentFee:N2} ₫";
+        lblDeposit.Text = $"{Deposit:N2} ₫";
+        lblTotal.Text = $"{Deposit + RentFee:N2} ₫";
     }
 
     void Pay_Click(object sender, RoutedEventArgs e)
     {
         if (dpStart.SelectedDate is not DateTime start || start.Date < DateTime.Today)
-        { MessageBox.Show("Ngày bắt đầu không hợp lệ."); return; }
+        {
+            lblBookingError.Text = "Chọn ngày bắt đầu từ hôm nay trở đi.";
+            dpStart.Focus();
+            lblBookingError.BringIntoView();
+            return;
+        }
         if (start.Date > DateTime.Today.AddYears(5) || cbMonths.SelectedItem is not int months)
-        { MessageBox.Show("Chọn ngày trong vòng 5 năm và thời hạn thuê hợp lệ."); return; }
+        {
+            lblBookingError.Text = "Chọn ngày trong vòng 5 năm và thời hạn thuê hợp lệ.";
+            lblBookingError.BringIntoView();
+            return;
+        }
         Rental rental = null!;
         if (!UiActions.Try(() => rental = _db.CreateHold(_unit.Id, start, months, _unit.PricePerMonth))) return;
         var pay = new PaymentWindow(rental, _db) { Owner = this };

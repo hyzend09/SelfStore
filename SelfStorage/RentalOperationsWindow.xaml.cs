@@ -1,4 +1,5 @@
 using System.Windows;
+using System.Windows.Controls;
 
 namespace SelfStorage;
 
@@ -56,6 +57,11 @@ public partial class RentalOperationsWindow : Window
         }
     }
 
+    void Qr_Changed(object sender, TextChangedEventArgs e)
+    {
+        if (lblVerified != null) lblVerified.Text = "";
+    }
+
     void Verify_Click(object sender, RoutedEventArgs e)
     {
         lblVerified.Text = "";
@@ -78,9 +84,17 @@ public partial class RentalOperationsWindow : Window
             return;
         }
         if (_operation == RentalOperation.Inspect && !decimal.TryParse(txtDeduction.Text, out _))
-        { MessageBox.Show("Nhập phí phát sinh hợp lệ."); return; }
+        {
+            lblValidation.Text = "Nhập phí phát sinh hợp lệ.";
+            txtDeduction.Focus();
+            return;
+        }
         if (_operation == RentalOperation.Refund && chkConfirmed.IsChecked != true)
-        { MessageBox.Show("Hãy xác nhận đã thực hiện hoàn tiền / đối soát cọc."); return; }
+        {
+            lblValidation.Text = "Hãy xác nhận đã thực hiện hoàn tiền hoặc đối soát cọc.";
+            chkConfirmed.Focus();
+            return;
+        }
         var succeeded = UiActions.Try(() =>
         {
             switch (_operation)

@@ -1,13 +1,22 @@
 <Window x:Class="SelfStorage.BookingWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-        Title="SelfStore · Đặt kho" Width="492" SizeToContent="Height" MaxHeight="700"
+        Title="SelfStore · Đặt kho" Width="518" SizeToContent="Height" MaxHeight="700"
         Style="{StaticResource DialogWindow}" WindowStartupLocation="CenterOwner" ResizeMode="NoResize">
-    <ScrollViewer VerticalScrollBarVisibility="Auto">
-        <StackPanel Margin="25">
-            <TextBlock Text="Đặt kho" Style="{StaticResource TitleText}"/>
-            <TextBlock x:Name="lblInfo" Style="{StaticResource SectionTitle}" Margin="0,9,0,0"/>
-            <TextBlock x:Name="lblPrice" Style="{StaticResource MutedText}" Margin="0,3,0,20"/>
+    <Grid Background="{StaticResource Surface}">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+        <ScrollViewer VerticalScrollBarVisibility="Auto">
+          <StackPanel Margin="24">
+            <TextBlock Text="Đặt kho" Style="{StaticResource TitleText}" Margin="0,0,0,14"/>
+            <Border Style="{StaticResource SoftPanel}" Margin="0,0,0,16">
+                <StackPanel>
+                    <TextBlock x:Name="lblInfo" Style="{StaticResource SectionTitle}"/>
+                    <TextBlock x:Name="lblPrice" Style="{StaticResource MutedText}" Margin="0,4,0,0"/>
+                </StackPanel>
+            </Border>
             <Grid Margin="0,0,0,16">
                 <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
                 <StackPanel Margin="0,0,12,0">
@@ -19,20 +28,45 @@
                     <ComboBox x:Name="cbMonths" SelectionChanged="Recalc"/>
                 </StackPanel>
             </Grid>
-            <Border Style="{StaticResource SoftPanel}">
+            <Border Style="{StaticResource Card}">
                 <StackPanel>
-                    <TextBlock x:Name="lblEnd" Style="{StaticResource MutedText}" Margin="0,0,0,7"/>
-                    <TextBlock x:Name="lblRent" Margin="0,0,0,4" TextWrapping="Wrap"/>
-                    <TextBlock x:Name="lblDeposit" TextWrapping="Wrap"/>
-                    <Separator Margin="0,10"/>
-                    <TextBlock x:Name="lblTotal" Style="{StaticResource SectionTitle}" Foreground="{StaticResource Accent}"/>
+                    <TextBlock Text="Chi phí thuê kho" FontWeight="SemiBold" Margin="0,0,0,8"/>
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="Auto"/>
+                        </Grid.RowDefinitions>
+                        <TextBlock Text="Ngày kết thúc" Style="{StaticResource MutedText}"/>
+                        <TextBlock x:Name="lblEnd" Grid.Column="1" HorizontalAlignment="Right"/>
+                        <TextBlock x:Name="lblRentLabel" Grid.Row="1" Text="Phí thuê" Style="{StaticResource MutedText}" Margin="0,6,0,0"/>
+                        <TextBlock x:Name="lblRent" Grid.Row="1" Grid.Column="1" HorizontalAlignment="Right" Margin="0,6,0,0"/>
+                        <TextBlock Grid.Row="2" Text="Tiền cọc" Style="{StaticResource MutedText}" Margin="0,6,0,0"/>
+                        <TextBlock x:Name="lblDeposit" Grid.Row="2" Grid.Column="1" HorizontalAlignment="Right" Margin="0,6,0,0"/>
+                    </Grid>
+                    <Separator Margin="0,12"/>
+                    <TextBlock Text="Tổng thanh toán" FontWeight="SemiBold"/>
+                    <TextBlock x:Name="lblTotal" Style="{StaticResource MetricValue}" Foreground="{StaticResource Accent}" TextWrapping="Wrap"/>
                 </StackPanel>
             </Border>
-            <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,18,0,0">
-                <Button Content="Hủy" IsCancel="True"/>
-                <Button Content="Giữ kho 15 phút và thanh toán" Click="Pay_Click" IsDefault="True"
-                        Style="{StaticResource PrimaryButton}" Margin="0"/>
+            <TextBlock Text="Tiền cọc được đối soát sau khi trả kho." Style="{StaticResource MutedText}" Margin="0,12,0,0"/>
+            <TextBlock x:Name="lblBookingError" Foreground="{StaticResource Danger}" TextWrapping="Wrap"
+                       AutomationProperties.LiveSetting="Polite"/>
+          </StackPanel>
+        </ScrollViewer>
+        <Border Grid.Row="1" Background="{StaticResource Canvas}" BorderBrush="{StaticResource Line}" BorderThickness="0,1,0,0" Padding="24,14">
+            <StackPanel>
+                <TextBlock Text="Kho được giữ trong 15 phút để bạn hoàn tất thanh toán." Style="{StaticResource MutedText}" Margin="0,0,0,10"/>
+                <WrapPanel HorizontalAlignment="Right">
+                    <Button Content="Hủy" IsCancel="True"/>
+                    <Button Content="Giữ kho và thanh toán" Click="Pay_Click" IsDefault="True"
+                            Style="{StaticResource PrimaryButton}" Margin="0"/>
+                </WrapPanel>
             </StackPanel>
-        </StackPanel>
-    </ScrollViewer>
+        </Border>
+    </Grid>
 </Window>

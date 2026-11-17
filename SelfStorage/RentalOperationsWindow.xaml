@@ -3,8 +3,13 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         Width="590" SizeToContent="Height" MaxHeight="720" Style="{StaticResource DialogWindow}"
         WindowStartupLocation="CenterOwner" ResizeMode="NoResize">
-    <ScrollViewer VerticalScrollBarVisibility="Auto">
-        <StackPanel Margin="25">
+    <Grid Background="{StaticResource Surface}">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+        <ScrollViewer VerticalScrollBarVisibility="Auto">
+          <StackPanel Margin="24">
             <TextBlock x:Name="lblHeading" Style="{StaticResource TitleText}" Margin="0,0,0,12"/>
             <Border Style="{StaticResource SoftPanel}" Margin="0,0,0,15">
                 <StackPanel>
@@ -14,13 +19,15 @@
             </Border>
             <TextBlock x:Name="lblStartReturn" Style="{StaticResource MutedText}" Margin="0,0,0,12" Visibility="Collapsed"/>
             <StackPanel x:Name="pickupPanel">
-                <TextBlock Text="Quét bằng đầu đọc QR hoặc dán nội dung mã của khách:" TextWrapping="Wrap"/>
-                <TextBox x:Name="txtQr" Padding="6" Margin="0,4" MaxLength="1000" AutomationProperties.Name="Mã QR của khách"/>
-                <Button x:Name="btnVerify" Content="Kiểm tra QR bàn giao" HorizontalAlignment="Left" Click="Verify_Click"/>
+                <Label Content="Mã QR của khách" Target="{Binding ElementName=txtQr}" Style="{StaticResource FieldLabel}"/>
+                <TextBlock Text="Quét bằng đầu đọc QR hoặc dán nội dung mã của khách." Style="{StaticResource MutedText}" Margin="0,0,0,6"/>
+                <TextBox x:Name="txtQr" Margin="0,0,0,8" MaxLength="1000" TextChanged="Qr_Changed"/>
+                <Button x:Name="btnVerify" Content="Kiểm tra QR bàn giao" HorizontalAlignment="Left" Click="Verify_Click" Margin="0"/>
                 <TextBlock x:Name="lblVerified" TextWrapping="Wrap" Foreground="{StaticResource Accent}" Margin="0,4,0,8"/>
             </StackPanel>
             <StackPanel x:Name="inspectionPanel">
-                <TextBlock Text="Phí phát sinh (₫)"/>
+                <TextBlock Text="Biên bản trả kho" Style="{StaticResource SectionTitle}" Margin="0,4,0,8"/>
+                <Label Content="Phí phát sinh (₫)" Target="{Binding ElementName=txtDeduction}" Style="{StaticResource FieldLabel}"/>
                 <TextBox x:Name="txtDeduction" Text="0" Padding="6" Margin="0,4,0,10" AutomationProperties.Name="Phí phát sinh"/>
                 <Label Content="Tình trạng kho và lý do tính phí" Target="{Binding ElementName=txtNotes}" Style="{StaticResource FieldLabel}"/>
                 <TextBox x:Name="txtNotes" AcceptsReturn="True" TextWrapping="Wrap" Height="100" VerticalScrollBarVisibility="Auto" Padding="6" Margin="0,4,0,10" MaxLength="1000"/>
@@ -31,6 +38,7 @@
                 <TextBlock Text="Phí được khấu trừ tối đa bằng tiền cọc. Phần vượt cọc được ghi riêng để Admin xử lý." Style="{StaticResource MutedText}"/>
             </StackPanel>
             <StackPanel x:Name="refundPanel">
+                <TextBlock Text="Đối soát tiền cọc" Style="{StaticResource SectionTitle}" Margin="0,0,0,8"/>
                 <TextBlock x:Name="lblInspection" TextWrapping="Wrap" Margin="0,0,0,12"/>
                 <Label Content="Mã giao dịch hoàn tiền / số phiếu chi" Target="{Binding ElementName=txtReference}" Style="{StaticResource FieldLabel}"/>
                 <TextBox x:Name="txtReference" Padding="6" Margin="0,4,0,10" MaxLength="200"/>
@@ -39,11 +47,26 @@
                 </CheckBox>
                 <TextBlock Text="Xác nhận sẽ đóng đơn và cập nhật trạng thái kho theo biên bản kiểm tra." Style="{StaticResource MutedText}" Margin="0,8"/>
             </StackPanel>
-            <TextBlock x:Name="lblValidation" Foreground="{StaticResource Danger}" TextWrapping="Wrap" AutomationProperties.LiveSetting="Polite"/>
-            <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,16,0,0">
-                <Button Content="Hủy" IsCancel="True"/>
-                <Button x:Name="btnConfirm" Click="Confirm_Click" Style="{StaticResource PrimaryButton}" Margin="0"/>
+          </StackPanel>
+        </ScrollViewer>
+        <Border Grid.Row="1" Background="{StaticResource Canvas}" BorderBrush="{StaticResource Line}" BorderThickness="0,1,0,0" Padding="24,14">
+            <StackPanel>
+                <TextBlock x:Name="lblValidation" Foreground="{StaticResource Danger}" TextWrapping="Wrap"
+                           AutomationProperties.LiveSetting="Polite">
+                    <TextBlock.Style>
+                        <Style TargetType="TextBlock">
+                            <Setter Property="Margin" Value="0,0,0,8"/>
+                            <Style.Triggers>
+                                <Trigger Property="Text" Value=""><Setter Property="Visibility" Value="Collapsed"/></Trigger>
+                            </Style.Triggers>
+                        </Style>
+                    </TextBlock.Style>
+                </TextBlock>
+                <WrapPanel HorizontalAlignment="Right">
+                    <Button Content="Hủy" IsCancel="True"/>
+                    <Button x:Name="btnConfirm" Click="Confirm_Click" Style="{StaticResource PrimaryButton}" Margin="0"/>
+                </WrapPanel>
             </StackPanel>
-        </StackPanel>
-    </ScrollViewer>
+        </Border>
+    </Grid>
 </Window>

@@ -30,6 +30,7 @@ public partial class PaymentWindow : Window
             : rbWallet.IsChecked == true ? "Ví điện tử" : "Chuyển khoản";
         btnPay.IsEnabled = rbCard.IsEnabled = rbWallet.IsEnabled = rbTransfer.IsEnabled = false;
         btnPay.Content = "Đang xử lý...";
+        if (SystemParameters.ClientAreaAnimation) paymentProgress.Visibility = Visibility.Visible;
         try { await Task.Delay(1000, _lifetime.Token); } // giả lập gọi cổng thanh toán
         catch (OperationCanceledException) { return; }
         if (_closed) return;
@@ -37,6 +38,7 @@ public partial class PaymentWindow : Window
         {
             btnPay.IsEnabled = rbCard.IsEnabled = rbWallet.IsEnabled = rbTransfer.IsEnabled = true;
             btnPay.Content = "Xác nhận thanh toán";
+            paymentProgress.Visibility = Visibility.Collapsed;
             return;
         }
         SelectedMethod = method;

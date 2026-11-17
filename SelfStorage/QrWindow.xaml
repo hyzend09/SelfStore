@@ -3,21 +3,44 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         Title="SelfStore · Mã QR đơn thuê" Width="428" SizeToContent="Height" MaxHeight="700"
         Style="{StaticResource DialogWindow}" WindowStartupLocation="CenterOwner" ResizeMode="NoResize">
-    <ScrollViewer VerticalScrollBarVisibility="Auto" Background="{StaticResource Surface}">
-        <StackPanel Margin="24">
+    <Grid Background="{StaticResource Surface}">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+        <ScrollViewer VerticalScrollBarVisibility="Auto">
+          <StackPanel Margin="24,24,24,16">
             <TextBlock Text="Mã QR đơn thuê" Style="{StaticResource TitleText}" TextAlignment="Center" Margin="0,0,0,8"/>
             <TextBlock x:Name="lblTitle" FontSize="16" FontWeight="SemiBold" TextWrapping="Wrap" TextAlignment="Center"/>
             <TextBlock x:Name="lblSub" Style="{StaticResource MutedText}" TextAlignment="Center" Margin="0,4,0,12"/>
-            <Border Style="{StaticResource Card}" HorizontalAlignment="Center" Padding="8">
-                <Image x:Name="imgQr" Width="200" Height="200" AutomationProperties.Name="Mã QR dùng khi nhận và trả kho"/>
+            <Border Style="{StaticResource Card}" HorizontalAlignment="Center" Padding="12">
+                <Image x:Name="imgQr" Width="208" Height="208" RenderOptions.BitmapScalingMode="NearestNeighbor"
+                       AutomationProperties.Name="Mã QR dùng khi nhận và trả kho"/>
             </Border>
             <TextBlock Text="Xuất trình mã cho Admin khi nhận và trả kho." Style="{StaticResource MutedText}" TextAlignment="Center" Margin="0,13,0,8"/>
-            <TextBox x:Name="txtQrContent" IsReadOnly="True" TextWrapping="Wrap" AutomationProperties.Name="Nội dung mã QR"/>
-            <TextBlock x:Name="lblCopy" Foreground="{StaticResource Accent}" Margin="0,5,0,0" AutomationProperties.LiveSetting="Polite" TextAlignment="Right"/>
-            <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,8,0,0">
-                <Button Content="Đóng" IsDefault="True" IsCancel="True"/>
-                <Button Content="Sao chép mã" Click="Copy_Click" Style="{StaticResource PrimaryButton}" Margin="0"/>
+            <Expander Header="Xem nội dung mã" Padding="0,4">
+                <TextBox x:Name="txtQrContent" IsReadOnly="True" TextWrapping="Wrap" Margin="0,6,0,0"
+                         AutomationProperties.Name="Nội dung mã QR"/>
+            </Expander>
+          </StackPanel>
+        </ScrollViewer>
+        <Border Grid.Row="1" Background="{StaticResource Canvas}" BorderBrush="{StaticResource Line}" BorderThickness="0,1,0,0" Padding="24,14">
+            <StackPanel>
+                <TextBlock x:Name="lblCopy" Foreground="{StaticResource Accent}" AutomationProperties.LiveSetting="Polite" TextAlignment="Right">
+                    <TextBlock.Style>
+                        <Style TargetType="TextBlock">
+                            <Setter Property="Margin" Value="0,0,0,8"/>
+                            <Style.Triggers>
+                                <Trigger Property="Text" Value=""><Setter Property="Visibility" Value="Collapsed"/></Trigger>
+                            </Style.Triggers>
+                        </Style>
+                    </TextBlock.Style>
+                </TextBlock>
+                <WrapPanel HorizontalAlignment="Right">
+                    <Button Content="Đóng" IsDefault="True" IsCancel="True"/>
+                    <Button Content="Sao chép mã QR" Click="Copy_Click" Style="{StaticResource PrimaryButton}" Margin="0"/>
+                </WrapPanel>
             </StackPanel>
-        </StackPanel>
-    </ScrollViewer>
+        </Border>
+    </Grid>
 </Window>

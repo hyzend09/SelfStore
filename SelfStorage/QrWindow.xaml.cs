@@ -18,10 +18,12 @@ public partial class QrWindow : Window
         try
         {
             Clipboard.SetText(txtQrContent.Text);
+            lblCopy.SetResourceReference(System.Windows.Controls.TextBlock.ForegroundProperty, "Accent");
             lblCopy.Text = "Đã sao chép mã QR.";
         }
         catch (System.Runtime.InteropServices.ExternalException)
         {
+            lblCopy.SetResourceReference(System.Windows.Controls.TextBlock.ForegroundProperty, "Danger");
             lblCopy.Text = "Chưa sao chép được. Hãy thử lại.";
         }
     }

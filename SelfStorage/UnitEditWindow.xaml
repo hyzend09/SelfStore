@@ -5,7 +5,7 @@
         WindowStartupLocation="CenterOwner" ResizeMode="NoResize">
     <ScrollViewer VerticalScrollBarVisibility="Auto">
         <StackPanel Margin="25">
-            <TextBlock Text="Thông tin kho" Style="{StaticResource TitleText}" Margin="0,0,0,18"/>
+            <TextBlock Text="Thông tin kho" Style="{StaticResource TitleText}" Margin="0,0,0,16"/>
             <Label Content="Vị trí" Target="{Binding ElementName=cbFacility}" Style="{StaticResource FieldLabel}"/>
             <ComboBox x:Name="cbFacility" DisplayMemberPath="Name" Margin="0,0,0,12"/>
             <Label Content="Mã kho" Target="{Binding ElementName=txtCode}" Style="{StaticResource FieldLabel}"/>
@@ -23,8 +23,13 @@
                     <TextBox x:Name="txtPrice"/>
                 </StackPanel>
             </Grid>
-            <CheckBox x:Name="chkAvail" Content="Sẵn sàng cho thuê (bỏ chọn để đưa vào bảo trì)" IsChecked="True"/>
-            <TextBlock x:Name="lblNote" Style="{StaticResource MutedText}"/>
+            <Border Style="{StaticResource SoftPanel}" Padding="14">
+                <StackPanel>
+                    <CheckBox x:Name="chkAvail" Content="Sẵn sàng cho thuê" IsChecked="True"/>
+                    <TextBlock x:Name="lblNote" Text="Bỏ chọn để chuyển kho sang bảo trì."
+                               Style="{StaticResource MutedText}" Margin="0,4,0,0"/>
+                </StackPanel>
+            </Border>
             <TextBlock x:Name="lblError" Foreground="{StaticResource Danger}" TextWrapping="Wrap" Margin="0,6,0,0" AutomationProperties.LiveSetting="Polite"/>
             <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,14,0,0">
                 <Button Content="Hủy" IsCancel="True"/>
